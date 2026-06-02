@@ -1,4 +1,5 @@
 import {
+  ChevronDown,
   Clipboard,
   ExternalLink,
   GripVertical,
@@ -24,6 +25,7 @@ import {
   reorderItems,
 } from "@/lib/votingReport";
 import type { AgendaItem, ItemType, Recommendation, ReportFormState } from "@/lib/votingReport";
+import { cn } from "@/utils/cn";
 
 const STORAGE_KEY = "npu-voting-report:v1";
 const UPDATES_URL =
@@ -42,6 +44,27 @@ const EMPTY_NEW_ITEM: NewItemForm = {
   recommendation: "PENDING",
   comments: "",
 };
+
+const labelClass = "text-[10px] font-bold uppercase tracking-wide text-muted-foreground";
+const printLabelClass = `${labelClass} print:text-black`;
+const sectionHeadingClass = "m-0 text-base font-extrabold text-foreground print:text-black";
+const reportPanelClass =
+  "mb-4 rounded-2xl bg-card p-4 text-sm text-muted-foreground shadow-sm ring-1 ring-border print:mb-4 print:rounded-none print:p-0 print:shadow-none print:ring-0";
+const screenPanelClass =
+  "mb-4 rounded-2xl bg-card p-4 text-sm text-muted-foreground shadow-sm ring-1 ring-border print:hidden";
+const fieldClass =
+  "min-h-11 w-full rounded-xl border border-input bg-card px-3 py-2 text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/15 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0";
+const selectFieldClass = cn(fieldClass, "appearance-none pr-10");
+const screenFieldClass =
+  "min-h-11 w-full rounded-xl border border-input bg-card px-3 py-2 text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/15";
+const subtleButtonClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-muted hover:text-primary focus:outline-none focus:ring-4 focus:ring-primary/15";
+const primaryButtonClass =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/15 transition-colors hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20";
+const inlineEditClass =
+  "w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/15 print:border-0 print:bg-transparent print:p-0 print:ring-0";
+const iconButtonClass =
+  "inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-colors focus:outline-none focus:ring-4 focus:ring-primary/15";
 
 function createItemId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -419,106 +442,105 @@ export default function VotingReportForm() {
     <main className="mx-auto w-[min(1180px,calc(100%-2rem))] py-8 print:w-full print:py-0">
       <dialog
         ref={dialogRef}
-        className="w-[min(26rem,calc(100%-2rem))] rounded-2xl border border-slate-200 bg-white p-6 text-slate-950 shadow-2xl backdrop:bg-slate-950/40"
+        className="w-[min(26rem,calc(100%-2rem))] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-foreground/40"
       >
-        <p className="m-0 mb-4 text-sm text-slate-700">{dialogMessage}</p>
+        <p className="m-0 mb-4 text-sm text-muted-foreground">{dialogMessage}</p>
         <button
           type="button"
-          className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-950 shadow-sm transition-colors hover:border-blue-200 hover:bg-slate-50"
+          className={subtleButtonClass}
           onClick={() => dialogRef.current?.close()}
         >
           OK
         </button>
       </dialog>
 
-      <header className="mb-6 grid items-center gap-5 sm:grid-cols-[minmax(9rem,14rem)_1fr_auto] print:mb-6 print:grid-cols-[1.5in_1fr]">
+      <header className="mb-6 print:mb-6">
         <img
           src="/npu-logo-black.png"
           alt="City of Atlanta Department of City Planning Neighborhood Planning Units"
-          className="block w-full max-w-52 object-contain print:max-w-[1.5in]"
+          className="mx-auto mb-8 block w-[min(760px,90%)] object-contain print:mb-6 print:w-[4.8in]"
         />
-        <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500 print:text-black">
-            City of Atlanta Department of City Planning
-          </p>
-          <h1
-            id="report-heading"
-            className="m-0 text-4xl font-extrabold leading-none tracking-tight text-slate-950 sm:text-5xl print:text-2xl"
-          >
-            {reportTitle}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2 print:hidden">
-          <button
-            type="button"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-950 shadow-sm transition-colors hover:border-blue-200 hover:bg-slate-50 sm:min-w-32"
-            onClick={handleClearTable}
-          >
-            <RotateCcw aria-hidden="true" size={18} />
-            Clear Table
-          </button>
-          <button
-            type="button"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-colors hover:bg-blue-700 sm:min-w-24"
-            onClick={handlePrint}
-          >
-            <Printer aria-hidden="true" size={18} />
-            Print
-          </button>
+        <div className="grid items-center gap-5 sm:grid-cols-[1fr_auto]">
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground print:text-black">
+              City of Atlanta Department of City Planning
+            </p>
+            <h1
+              id="report-heading"
+              className="m-0 font-display text-5xl font-semibold uppercase leading-none tracking-normal text-foreground sm:text-6xl print:text-3xl"
+            >
+              {reportTitle}
+            </h1>
+          </div>
+          <div className="flex items-center gap-2 print:hidden">
+            <button
+              type="button"
+              className={cn(subtleButtonClass, "sm:min-w-32")}
+              onClick={handleClearTable}
+            >
+              <RotateCcw aria-hidden="true" size={18} />
+              Clear Table
+            </button>
+            <button
+              type="button"
+              className={cn(primaryButtonClass, "sm:min-w-24")}
+              onClick={handlePrint}
+            >
+              <Printer aria-hidden="true" size={18} />
+              Print
+            </button>
+          </div>
         </div>
       </header>
 
       <section
-        className="mb-4 rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200 print:mb-4 print:rounded-none print:p-0 print:shadow-none print:ring-0"
+        className={reportPanelClass}
         aria-labelledby="page-info-heading"
       >
         <div className="mb-4 flex items-center justify-between gap-4">
-          <h2
-            id="page-info-heading"
-            className="m-0 text-base font-extrabold text-slate-950 print:text-black"
-          >
+          <h2 id="page-info-heading" className={sectionHeadingClass}>
             Report Details
           </h2>
-          <span className="text-xs font-bold text-slate-500 print:hidden">
+          <span className="text-xs font-bold text-muted-foreground print:hidden">
             {hasLoadedStorage ? "Saved locally" : "Loading saved form"}
           </span>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-[minmax(6rem,0.55fr)_repeat(2,minmax(12rem,1fr))] print:grid-cols-2 print:gap-x-8 print:gap-y-2">
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 print:text-black">
-              NPU
+            <span className={printLabelClass}>NPU</span>
+            <span className="relative block">
+              <select
+                className={selectFieldClass}
+                value={report.npu}
+                onChange={(event) => updateReportField("npu", event.target.value)}
+              >
+                {NPU_OPTIONS.map((npu) => (
+                  <option key={npu} value={npu}>
+                    {npu}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground print:hidden"
+              />
             </span>
-            <select
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
-              value={report.npu}
-              onChange={(event) => updateReportField("npu", event.target.value)}
-            >
-              {NPU_OPTIONS.map((npu) => (
-                <option key={npu} value={npu}>
-                  {npu}
-                </option>
-              ))}
-            </select>
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 print:text-black">
-              Chair
-            </span>
+            <span className={printLabelClass}>Chair</span>
             <input
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
+              className={fieldClass}
               value={report.chair}
               onChange={(event) => updateReportField("chair", event.target.value)}
               type="text"
             />
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 print:text-black">
-              Meeting Date
-            </span>
+            <span className={printLabelClass}>Meeting Date</span>
             <input
               ref={dateInputRef}
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
+              className={fieldClass}
               value={report.meetingDate}
               onChange={(event) => updateReportField("meetingDate", event.target.value)}
               type="date"
@@ -526,33 +548,29 @@ export default function VotingReportForm() {
             />
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 print:text-black">
-              Location
-            </span>
+            <span className={printLabelClass}>Location</span>
             <input
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
+              className={fieldClass}
               value={report.location}
               onChange={(event) => updateReportField("location", event.target.value)}
               type="text"
             />
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 print:text-black">
-              Planner
-            </span>
+            <span className={printLabelClass}>Planner</span>
             <input
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
+              className={fieldClass}
               value={report.planner}
               onChange={(event) => updateReportField("planner", event.target.value)}
               type="text"
             />
           </label>
           <label className="grid grid-cols-[1fr_auto] items-end gap-3 print:hidden">
-            <span className="self-center text-sm font-bold text-slate-700">
+            <span className="self-center text-sm font-bold text-foreground">
               Autofill application numbers
             </span>
             <input
-              className="relative h-7 w-12 appearance-none rounded-full border border-slate-200 bg-slate-100 p-0 transition checked:border-blue-500 checked:bg-blue-100 before:absolute before:left-1 before:top-1 before:h-5 before:w-5 before:rounded-full before:bg-slate-400 before:transition checked:before:translate-x-5 checked:before:bg-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-100"
+              className="relative h-7 w-12 appearance-none rounded-full border border-input bg-muted p-0 transition checked:border-primary checked:bg-accent before:absolute before:left-1 before:top-1 before:h-5 before:w-5 before:rounded-full before:bg-muted-foreground before:transition checked:before:translate-x-5 checked:before:bg-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
               checked={report.autofill}
               onChange={(event) => handleAutofillChange(event.target.checked)}
               type="checkbox"
@@ -562,15 +580,15 @@ export default function VotingReportForm() {
       </section>
 
       <section
-        className="mb-4 rounded-2xl bg-white p-4 text-sm text-slate-600 shadow-sm ring-1 ring-slate-200 print:hidden"
+        className={screenPanelClass}
         aria-labelledby="new-item"
       >
         <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 id="new-item" className="m-0 text-base font-extrabold text-slate-950">
+          <h2 id="new-item" className={sectionHeadingClass}>
             New Item
           </h2>
           {pendingCount > 0 ? (
-            <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">
+            <span className="rounded-full bg-warning px-3 py-1 text-xs font-bold text-warning-foreground ring-1 ring-warning-foreground/20">
               {pendingCount} pending
             </span>
           ) : null}
@@ -581,11 +599,9 @@ export default function VotingReportForm() {
           onSubmit={handleAddItem}
         >
           <label className="grid gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Type
-            </span>
+            <span className={labelClass}>Type</span>
             <select
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+              className={screenFieldClass}
               value={newItem.itemType}
               onChange={(event) => handleNewItemTypeChange(event.target.value)}
               required
@@ -601,11 +617,9 @@ export default function VotingReportForm() {
             </select>
           </label>
           <label className="grid min-w-0 gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Application # / Name
-            </span>
+            <span className={labelClass}>Application # / Name</span>
             <input
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+              className={screenFieldClass}
               value={newItem.applicationName}
               onChange={(event) => handleNewApplicationName(event.target.value)}
               onFocus={moveCursorToEnd}
@@ -620,11 +634,9 @@ export default function VotingReportForm() {
             />
           </label>
           <label className="grid gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Recommendation
-            </span>
+            <span className={labelClass}>Recommendation</span>
             <select
-              className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+              className={screenFieldClass}
               value={newItem.recommendation}
               onChange={(event) =>
                 setNewItem((currentItem) => ({
@@ -645,11 +657,9 @@ export default function VotingReportForm() {
             </select>
           </label>
           <label className="grid gap-1 lg:col-span-4">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-              Comments / Conditions
-            </span>
+            <span className={labelClass}>Comments / Conditions</span>
             <textarea
-              className="min-h-20 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+              className={cn(screenFieldClass, "min-h-20 resize-y")}
               value={newItem.comments}
               onChange={(event) =>
                 setNewItem((currentItem) => ({
@@ -662,7 +672,7 @@ export default function VotingReportForm() {
           </label>
           <button
             type="submit"
-            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-bold text-white shadow-lg shadow-blue-100 transition-colors hover:bg-blue-700 lg:w-auto lg:min-w-36"
+            className={cn(primaryButtonClass, "w-full px-5 lg:w-auto lg:min-w-36")}
           >
             <Plus aria-hidden="true" size={18} />
             Add to Table
@@ -671,35 +681,32 @@ export default function VotingReportForm() {
       </section>
 
       <section
-        className="mb-4 overflow-hidden rounded-2xl bg-white text-sm text-slate-600 shadow-sm ring-1 ring-slate-200 print:mb-4 print:rounded-none print:shadow-none print:ring-0"
+        className="mb-4 overflow-hidden rounded-2xl bg-card text-sm text-muted-foreground shadow-sm ring-1 ring-border print:mb-4 print:rounded-none print:shadow-none print:ring-0"
         aria-labelledby="agenda-heading"
       >
-        <div className="flex items-center justify-between gap-4 border-b border-slate-200 p-4 print:border-0 print:p-0 print:pb-2">
-          <h2
-            id="agenda-heading"
-            className="m-0 text-base font-extrabold text-slate-950 print:text-black"
-          >
+        <div className="flex items-center justify-between gap-4 border-b border-border p-4 print:border-0 print:p-0 print:pb-2">
+          <h2 id="agenda-heading" className={sectionHeadingClass}>
             Agenda Items
           </h2>
-          <span className="text-xs font-bold text-slate-500 print:text-black">
+          <span className="text-xs font-bold text-muted-foreground print:text-black">
             {report.items.length} total
           </span>
         </div>
 
         <div className="overflow-x-auto print:overflow-visible">
           <table className="w-full min-w-[760px] table-fixed border-collapse print:min-w-0 print:text-[10pt]">
-            <thead className="bg-slate-50">
+            <thead className="bg-muted">
               <tr>
-                <th className="w-36 border-b border-slate-200 px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-slate-500 print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
+                <th className="w-36 border-b border-border px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
                   Type
                 </th>
-                <th className="border-b border-slate-200 px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-slate-500 print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
+                <th className="border-b border-border px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
                   Application # / Name
                 </th>
-                <th className="w-56 border-b border-slate-200 px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-slate-500 print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
+                <th className="w-56 border-b border-border px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
                   NPU Recommendation
                 </th>
-                <th className="w-28 border-b border-slate-200 px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-slate-500 print:hidden">
+                <th className="w-28 border-b border-border px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:hidden">
                   Actions
                 </th>
               </tr>
@@ -708,7 +715,7 @@ export default function VotingReportForm() {
               <tbody>
                 <tr>
                   <td
-                    className="h-20 border-b border-slate-200 px-3 py-3 text-center text-slate-500 print:border print:border-neutral-600 print:px-2 print:py-1"
+                    className="h-20 border-b border-border px-3 py-3 text-center text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1"
                     colSpan={4}
                   >
                     No agenda items added.
@@ -722,9 +729,10 @@ export default function VotingReportForm() {
                 return (
                   <tbody
                     key={item.id}
-                    className={`break-inside-avoid odd:bg-white even:bg-slate-50/70 ${
-                      draggingId === item.id ? "opacity-50" : ""
-                    }`}
+                    className={cn(
+                      "break-inside-avoid odd:bg-card even:bg-muted/60",
+                      draggingId === item.id && "opacity-50",
+                    )}
                     draggable
                     onDragStart={(event) => handleDragStart(item.id, event)}
                     onDragOver={handleDragOver}
@@ -732,19 +740,19 @@ export default function VotingReportForm() {
                     onDragEnd={() => setDraggingId(null)}
                   >
                     <tr>
-                      <td className="border-b border-slate-200 px-3 py-2 font-extrabold text-slate-950 print:border print:border-neutral-600 print:px-2 print:py-1">
+                      <td className="border-b border-border px-3 py-2 font-extrabold text-foreground print:border print:border-neutral-600 print:px-2 print:py-1">
                         <span className="flex cursor-grab items-center gap-1.5 active:cursor-grabbing print:cursor-default">
                           <GripVertical
                             aria-hidden="true"
-                            className="text-slate-400 print:hidden"
+                            className="text-muted-foreground print:hidden"
                             size={18}
                           />
                           <span>{item.itemType}</span>
                         </span>
                       </td>
-                      <td className="border-b border-slate-200 px-3 py-2 print:border print:border-neutral-600 print:px-2 print:py-1">
+                      <td className="border-b border-border px-3 py-2 print:border print:border-neutral-600 print:px-2 print:py-1">
                         <input
-                          className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-slate-950 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 print:border-0 print:bg-transparent print:p-0 print:ring-0"
+                          className={inlineEditClass}
                           value={item.applicationName}
                           onChange={(event) =>
                             updateItem(item.id, {
@@ -755,13 +763,15 @@ export default function VotingReportForm() {
                           aria-label={`Application name for ${item.itemType}`}
                         />
                       </td>
-                      <td className="border-b border-slate-200 px-3 py-2 text-right print:border print:border-neutral-600 print:px-2 print:py-1">
+                      <td className="border-b border-border px-3 py-2 text-right print:border print:border-neutral-600 print:px-2 print:py-1">
                         <select
-                          className={`w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-right outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 print:border-0 print:bg-transparent print:p-0 print:ring-0 ${
+                          className={cn(
+                            inlineEditClass,
+                            "text-right",
                             item.recommendation === "PENDING"
-                              ? "font-bold text-amber-700"
-                              : "text-slate-950"
-                          }`}
+                              ? "font-bold text-warning-foreground"
+                              : "text-foreground",
+                          )}
                           value={item.recommendation}
                           onChange={(event) =>
                             updateItem(item.id, {
@@ -777,11 +787,11 @@ export default function VotingReportForm() {
                           ))}
                         </select>
                       </td>
-                      <td className="border-b border-slate-200 px-3 py-2 text-right print:hidden">
+                      <td className="border-b border-border px-3 py-2 text-right print:hidden">
                         <div className="flex items-center justify-end gap-2">
                           <button
                             type="button"
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-blue-200 hover:bg-slate-50 hover:text-blue-700"
+                            className={cn(iconButtonClass, "hover:border-primary/30 hover:bg-muted hover:text-primary")}
                             onClick={() => openCommentEditor(item.id)}
                             aria-label={`Add comments for ${item.applicationName}`}
                             title="Add comments"
@@ -790,7 +800,7 @@ export default function VotingReportForm() {
                           </button>
                           <button
                             type="button"
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                            className={cn(iconButtonClass, "hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive")}
                             onClick={() => handleDeleteItem(item.id)}
                             aria-label={`Delete ${item.applicationName}`}
                             title="Delete item"
@@ -806,12 +816,12 @@ export default function VotingReportForm() {
                           colSpan={4}
                           className={
                             item.comments.trim()
-                              ? "border-b border-slate-200 bg-slate-50 px-3 py-2 print:border print:border-neutral-600 print:bg-white print:px-2 print:py-1"
-                              : "border-b border-slate-200 bg-slate-50 px-3 py-2 print:hidden"
+                              ? "border-b border-border bg-muted px-3 py-2 print:border print:border-neutral-600 print:bg-white print:px-2 print:py-1"
+                              : "border-b border-border bg-muted px-3 py-2 print:hidden"
                           }
                         >
                           <textarea
-                            className="min-h-14 w-full resize-y rounded-lg border border-transparent bg-transparent px-2 py-1 text-slate-950 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 print:border-0 print:bg-transparent print:p-0 print:ring-0"
+                            className={cn(inlineEditClass, "min-h-14 resize-y")}
                             value={item.comments}
                             onChange={(event) =>
                               updateItem(item.id, {
@@ -834,16 +844,16 @@ export default function VotingReportForm() {
       </section>
 
       <section
-        className="mb-4 rounded-2xl bg-white p-4 text-sm text-slate-600 ring-1 ring-slate-200 print:mb-4 print:rounded-none print:p-0 print:ring-0"
+        className={cn(reportPanelClass, "shadow-none")}
         aria-labelledby="notes"
       >
         <div className="mb-4 print:mb-2">
-          <h2 id="notes" className="m-0 text-base font-extrabold text-slate-950 print:text-black">
+          <h2 id="notes" className={sectionHeadingClass}>
             Planner&apos;s Notes
           </h2>
         </div>
         <textarea
-          className="min-h-28 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:hidden"
+          className={cn(screenFieldClass, "min-h-28 resize-y print:hidden")}
           value={report.plannerNotes}
           onChange={(event) => updateReportField("plannerNotes", event.target.value)}
           rows={4}
@@ -862,7 +872,7 @@ export default function VotingReportForm() {
       >
         <a
           href={plannerScriptUrl}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-950 no-underline shadow-sm transition-colors hover:border-blue-200 hover:bg-slate-50 hover:text-blue-700"
+          className={cn(subtleButtonClass, "no-underline")}
           target="_blank"
           rel="noreferrer"
         >
@@ -871,7 +881,7 @@ export default function VotingReportForm() {
         </a>
         <a
           href={UPDATES_URL}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-950 no-underline shadow-sm transition-colors hover:border-blue-200 hover:bg-slate-50 hover:text-blue-700"
+          className={cn(subtleButtonClass, "no-underline")}
           target="_blank"
           rel="noreferrer"
         >
@@ -880,7 +890,7 @@ export default function VotingReportForm() {
         </a>
         <button
           type="button"
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-950 shadow-sm transition-colors hover:border-blue-200 hover:bg-slate-50 hover:text-blue-700"
+          className={subtleButtonClass}
           onClick={copyUpdatesLink}
         >
           <Clipboard aria-hidden="true" size={16} />

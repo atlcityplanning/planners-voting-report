@@ -44,7 +44,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="min-h-screen overflow-x-hidden bg-slate-50 font-sans text-slate-950 antialiased [overflow-wrap:anywhere] selection:bg-blue-100 selection:text-blue-950">
+      <body className="min-h-screen overflow-x-hidden bg-background font-sans text-foreground antialiased [overflow-wrap:anywhere] selection:bg-primary/15 selection:text-primary">
         <SiteHeader />
         {children}
         <SiteFooter />
