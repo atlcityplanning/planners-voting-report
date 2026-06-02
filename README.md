@@ -45,7 +45,7 @@ This project uses the Cloudflare Vite plugin (configured in `vite.config.ts`) an
 
 1. Install Wrangler: `npm install -g wrangler`
 2. Authenticate: `wrangler login`
-3. Deploy: `npx wrangler deploy`
+3. Deploy: `bun run deploy`
 
 For production env vars, run `wrangler secret put MY_VAR` for each secret listed in `.env.example`. Public (non-secret) vars go in `wrangler.jsonc` under `vars`.
 
