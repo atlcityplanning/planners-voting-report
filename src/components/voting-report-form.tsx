@@ -28,6 +28,8 @@ import {
   reorderItems,
 } from "@/lib/votingReport";
 import type { AgendaItem, ItemType, Recommendation, ReportFormState } from "@/lib/votingReport";
+import { useStore } from "@tanstack/react-form";
+import { useAppForm } from "@/hooks/form";
 import { NPU_CONTACT_SOURCE, getNpuContactDefault } from "@/lib/npuContactDirectory";
 import type { SubmissionRecipients } from "@/lib/votingReportWorkflow";
 import { getSubmissionRecipients, submitForReview } from "@/server/reportActions";
@@ -219,7 +221,10 @@ function applyContactDefaults(report: ReportFormState, mode: "fill-empty" | "rep
 }
 
 export default function VotingReportForm() {
-  const [report, setReport] = useState<ReportFormState>(INITIAL_REPORT_STATE);
+  const form = useAppForm({
+    defaultValues: INITIAL_REPORT_STATE,
+  });
+  const report = useStore(form.store, (state: any) => state.values as ReportFormState);
   const [newItem, setNewItem] = useState<NewItemForm>(EMPTY_NEW_ITEM);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -249,9 +254,12 @@ export default function VotingReportForm() {
   const reportTitle = report.meetingDate ? printLabels.headerTitle : "VOTING REPORT";
 
   useEffect(() => {
-    setReport(applyContactDefaults(loadStoredReport(), "fill-empty"));
+    const loaded = applyContactDefaults(loadStoredReport(), "fill-empty");
+    (Object.keys(loaded) as Array<keyof ReportFormState>).forEach(key => {
+      form.setFieldValue(key, loaded[key]);
+    });
     setHasLoadedStorage(true);
-  }, []);
+  }, [form]);
 
   useEffect(() => {
     if (!hasLoadedStorage) {
@@ -295,35 +303,23 @@ export default function VotingReportForm() {
     window.requestAnimationFrame(() => dialogRef.current?.showModal());
   }
 
-  function updateReportField<K extends keyof ReportFormState>(field: K, value: ReportFormState[K]) {
-    setReport((currentReport) => ({
-      ...currentReport,
-      [field]: value,
-    }));
-  }
-
   function handleNpuChange(npu: string) {
-    setReport((currentReport) =>
-      applyContactDefaults(
-        {
-          ...currentReport,
-          npu,
-        },
-        "replace",
-      ),
+    const currentReport = form.state.values;
+    const newReport = applyContactDefaults(
+      {
+        ...currentReport,
+        npu,
+      },
+      "replace",
     );
+    form.setFieldValue("npu", newReport.npu);
+    form.setFieldValue("chair", newReport.chair);
+    form.setFieldValue("planner", newReport.planner);
     setSubmittedReportId("");
   }
 
-  function updateItem(id: string, patch: Partial<AgendaItem>) {
-    setReport((currentReport) => ({
-      ...currentReport,
-      items: currentReport.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    }));
-  }
-
   function handleAutofillChange(autofill: boolean) {
-    updateReportField("autofill", autofill);
+    form.setFieldValue("autofill", autofill);
     setNewItem((currentItem) => {
       if (!currentItem.itemType) {
         return currentItem;
@@ -381,10 +377,7 @@ export default function VotingReportForm() {
       comments: newItem.comments.trim(),
     };
 
-    setReport((currentReport) => ({
-      ...currentReport,
-      items: [...currentReport.items, item],
-    }));
+    form.setFieldValue("items", [...form.state.values.items, item]);
     setNewItem(EMPTY_NEW_ITEM);
   }
 
@@ -393,11 +386,8 @@ export default function VotingReportForm() {
       return;
     }
 
-    setReport((currentReport) => ({
-      ...currentReport,
-      items: [],
-      plannerNotes: "",
-    }));
+    form.setFieldValue("items", []);
+    form.setFieldValue("plannerNotes", "");
     setOpenCommentIds([]);
   }
 
@@ -406,10 +396,7 @@ export default function VotingReportForm() {
       return;
     }
 
-    setReport((currentReport) => ({
-      ...currentReport,
-      items: currentReport.items.filter((item) => item.id !== itemId),
-    }));
+    form.setFieldValue("items", form.state.values.items.filter((item) => item.id !== itemId));
   }
 
   function handleApplicationKeyDown(item: AgendaItem, event: KeyboardEvent<HTMLInputElement>) {
@@ -451,10 +438,7 @@ export default function VotingReportForm() {
       return;
     }
 
-    setReport((currentReport) => ({
-      ...currentReport,
-      items: reorderItems(currentReport.items, activeId, overId),
-    }));
+    form.setFieldValue("items", reorderItems(form.state.values.items, activeId, overId));
     setDraggingId(null);
   }
 
@@ -534,7 +518,10 @@ export default function VotingReportForm() {
       }
 
       setSubmittedReportId(submittedReport.id);
-      setReport(submittedReport.report);
+      const newReport = submittedReport.report;
+      (Object.keys(newReport) as Array<keyof ReportFormState>).forEach((key) => {
+        form.setFieldValue(key, newReport[key]);
+      });
       setSubmissionMessage("Submitted for review. Notification attempts were logged.");
     } catch (error) {
       setSubmissionMessage(error instanceof Error ? error.message : "Unable to submit report.");
@@ -715,17 +702,22 @@ export default function VotingReportForm() {
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
             <span className={printLabelClass}>NPU</span>
             <span className="relative block">
-              <select
-                className={selectFieldClass}
-                value={report.npu}
-                onChange={(event) => handleNpuChange(event.target.value)}
-              >
-                {NPU_OPTIONS.map((npu) => (
-                  <option key={npu} value={npu}>
-                    {npu}
-                  </option>
-                ))}
-              </select>
+              <form.Field name="npu">
+                {(field) => (
+                  <select
+                    className={selectFieldClass}
+                    value={field.state.value}
+                    onChange={(event) => handleNpuChange(event.target.value)}
+                    onBlur={field.handleBlur}
+                  >
+                    {NPU_OPTIONS.map((npu) => (
+                      <option key={npu} value={npu}>
+                        {npu}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </form.Field>
               <ChevronDown
                 aria-hidden="true"
                 className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground print:hidden"
@@ -734,52 +726,77 @@ export default function VotingReportForm() {
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
             <span className={printLabelClass}>Chair</span>
-            <input
-              className={fieldClass}
-              value={report.chair}
-              onChange={(event) => updateReportField("chair", event.target.value)}
-              type="text"
-            />
+            <form.Field name="chair">
+              {(field) => (
+                <input
+                  className={fieldClass}
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onBlur={field.handleBlur}
+                  type="text"
+                />
+              )}
+            </form.Field>
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
             <span className={printLabelClass}>Meeting Date</span>
-            <input
-              ref={dateInputRef}
-              className={fieldClass}
-              value={report.meetingDate}
-              onChange={(event) => updateReportField("meetingDate", event.target.value)}
-              type="date"
-              required
-            />
+            <form.Field name="meetingDate">
+              {(field) => (
+                <input
+                  ref={dateInputRef}
+                  className={fieldClass}
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onBlur={field.handleBlur}
+                  type="date"
+                  required
+                />
+              )}
+            </form.Field>
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
             <span className={printLabelClass}>Location</span>
-            <input
-              className={fieldClass}
-              value={report.location}
-              onChange={(event) => updateReportField("location", event.target.value)}
-              type="text"
-            />
+            <form.Field name="location">
+              {(field) => (
+                <input
+                  className={fieldClass}
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onBlur={field.handleBlur}
+                  type="text"
+                />
+              )}
+            </form.Field>
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
             <span className={printLabelClass}>Planner</span>
-            <input
-              className={fieldClass}
-              value={report.planner}
-              onChange={(event) => updateReportField("planner", event.target.value)}
-              type="text"
-            />
+            <form.Field name="planner">
+              {(field) => (
+                <input
+                  className={fieldClass}
+                  value={field.state.value}
+                  onChange={(event) => field.handleChange(event.target.value)}
+                  onBlur={field.handleBlur}
+                  type="text"
+                />
+              )}
+            </form.Field>
           </label>
           <label className="grid grid-cols-[1fr_auto] items-end gap-3 print:hidden">
             <span className="self-center text-sm font-bold text-foreground">
               Autofill application numbers
             </span>
-            <input
-              className="relative h-7 w-12 appearance-none rounded-full border border-input bg-muted p-0 transition checked:border-primary checked:bg-accent before:absolute before:left-1 before:top-1 before:h-5 before:w-5 before:rounded-full before:bg-muted-foreground before:transition checked:before:translate-x-5 checked:before:bg-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
-              checked={report.autofill}
-              onChange={(event) => handleAutofillChange(event.target.checked)}
-              type="checkbox"
-            />
+            <form.Field name="autofill">
+              {(field) => (
+                <input
+                  className="relative h-7 w-12 appearance-none rounded-full border border-input bg-muted p-0 transition checked:border-primary checked:bg-accent before:absolute before:left-1 before:top-1 before:h-5 before:w-5 before:rounded-full before:bg-muted-foreground before:transition checked:before:translate-x-5 checked:before:bg-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
+                  checked={field.state.value}
+                  onChange={(event) => handleAutofillChange(event.target.checked)}
+                  onBlur={field.handleBlur}
+                  type="checkbox"
+                />
+              )}
+            </form.Field>
           </label>
         </div>
         <p className="m-0 mt-3 text-xs font-semibold text-muted-foreground print:hidden">
@@ -809,21 +826,27 @@ export default function VotingReportForm() {
         >
           <label className="grid gap-1">
             <span className={labelClass}>Type</span>
-            <select
-              className={screenFieldClass}
-              value={newItem.itemType}
-              onChange={(event) => handleNewItemTypeChange(event.target.value)}
-              required
-            >
-              <option value="" disabled>
-                Type
-              </option>
-              {ITEM_TYPES.map((itemType) => (
-                <option key={itemType.value} value={itemType.value}>
-                  {itemType.label}
+            <span className="relative block">
+              <select
+                className={cn(screenFieldClass, "appearance-none pr-10")}
+                value={newItem.itemType}
+                onChange={(event) => handleNewItemTypeChange(event.target.value)}
+                required
+              >
+                <option value="" disabled>
+                  Type
                 </option>
-              ))}
-            </select>
+                {ITEM_TYPES.map((itemType) => (
+                  <option key={itemType.value} value={itemType.value}>
+                    {itemType.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground print:hidden"
+              />
+            </span>
           </label>
           <label className="grid min-w-0 gap-1">
             <span className={labelClass}>Application # / Name</span>
@@ -844,26 +867,32 @@ export default function VotingReportForm() {
           </label>
           <label className="grid gap-1">
             <span className={labelClass}>Recommendation</span>
-            <select
-              className={screenFieldClass}
-              value={newItem.recommendation}
-              onChange={(event) =>
-                setNewItem((currentItem) => ({
-                  ...currentItem,
-                  recommendation: normalizeRecommendation(event.target.value),
-                }))
-              }
-            >
-              {RECOMMENDATIONS.map((recommendation) => (
-                <option
-                  key={recommendation.value}
-                  value={recommendation.value}
-                  disabled={recommendation.value === "PENDING"}
-                >
-                  {recommendation.label}
-                </option>
-              ))}
-            </select>
+            <span className="relative block">
+              <select
+                className={cn(screenFieldClass, "appearance-none pr-10")}
+                value={newItem.recommendation}
+                onChange={(event) =>
+                  setNewItem((currentItem) => ({
+                    ...currentItem,
+                    recommendation: normalizeRecommendation(event.target.value),
+                  }))
+                }
+              >
+                {RECOMMENDATIONS.map((recommendation) => (
+                  <option
+                    key={recommendation.value}
+                    value={recommendation.value}
+                    disabled={recommendation.value === "PENDING"}
+                  >
+                    {recommendation.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground print:hidden"
+              />
+            </span>
           </label>
           <label className="grid gap-1 lg:col-span-4">
             <span className={labelClass}>Comments / Conditions</span>
@@ -932,7 +961,7 @@ export default function VotingReportForm() {
                 </tr>
               </tbody>
             ) : (
-              report.items.map((item) => {
+              report.items.map((item: AgendaItem, index: number) => {
                 const showComments = item.comments.trim() || openCommentIds.includes(item.id);
 
                 return (
@@ -960,41 +989,45 @@ export default function VotingReportForm() {
                         </span>
                       </td>
                       <td className="border-b border-border px-3 py-2 print:border print:border-neutral-600 print:px-2 print:py-1">
-                        <input
-                          className={inlineEditClass}
-                          value={item.applicationName}
-                          onChange={(event) =>
-                            updateItem(item.id, {
-                              applicationName: event.target.value,
-                            })
-                          }
-                          onKeyDown={(event) => handleApplicationKeyDown(item, event)}
-                          aria-label={`Application name for ${item.itemType}`}
-                        />
+                        <form.Field name={`items[${index}].applicationName`}>
+                          {(field) => (
+                            <input
+                              className={inlineEditClass}
+                              value={field.state.value}
+                              onChange={(event) => field.handleChange(event.target.value)}
+                              onBlur={field.handleBlur}
+                              onKeyDown={(event) => handleApplicationKeyDown(item, event)}
+                              aria-label={`Application name for ${item.itemType}`}
+                            />
+                          )}
+                        </form.Field>
                       </td>
                       <td className="border-b border-border px-3 py-2 text-right print:border print:border-neutral-600 print:px-2 print:py-1">
-                        <select
-                          className={cn(
-                            inlineEditClass,
-                            "text-right",
-                            item.recommendation === "PENDING"
-                              ? "font-bold text-warning-foreground"
-                              : "text-foreground",
+                        <form.Field name={`items[${index}].recommendation`}>
+                          {(field) => (
+                            <select
+                              className={cn(
+                                inlineEditClass,
+                                "text-right",
+                                field.state.value === "PENDING"
+                                  ? "font-bold text-warning-foreground"
+                                  : "text-foreground",
+                              )}
+                              value={field.state.value}
+                              onChange={(event) =>
+                                field.handleChange(normalizeRecommendation(event.target.value))
+                              }
+                              onBlur={field.handleBlur}
+                              aria-label={`Recommendation for ${item.applicationName}`}
+                            >
+                            {RECOMMENDATIONS.map((recommendation) => (
+                              <option key={recommendation.value} value={recommendation.value}>
+                                {recommendation.label}
+                              </option>
+                            ))}
+                            </select>
                           )}
-                          value={item.recommendation}
-                          onChange={(event) =>
-                            updateItem(item.id, {
-                              recommendation: normalizeRecommendation(event.target.value),
-                            })
-                          }
-                          aria-label={`Recommendation for ${item.applicationName}`}
-                        >
-                          {RECOMMENDATIONS.map((recommendation) => (
-                            <option key={recommendation.value} value={recommendation.value}>
-                              {recommendation.label}
-                            </option>
-                          ))}
-                        </select>
+                        </form.Field>
                       </td>
                       <td className="border-b border-border px-3 py-2 text-right print:hidden">
                         <div className="flex items-center justify-end gap-2">
@@ -1029,18 +1062,21 @@ export default function VotingReportForm() {
                               : "border-b border-border bg-muted px-3 py-2 print:hidden"
                           }
                         >
-                          <textarea
-                            className={cn(inlineEditClass, "min-h-14 resize-y")}
-                            value={item.comments}
-                            onChange={(event) =>
-                              updateItem(item.id, {
-                                comments: event.target.value,
-                              })
-                            }
-                            onBlur={() => closeEmptyCommentEditor(item)}
-                            rows={2}
-                            aria-label={`Comments for ${item.applicationName}`}
-                          />
+                          <form.Field name={`items[${index}].comments`}>
+                            {(field) => (
+                              <textarea
+                                className={cn(inlineEditClass, "min-h-14 resize-y")}
+                                value={field.state.value}
+                                onChange={(event) => field.handleChange(event.target.value)}
+                                onBlur={() => {
+                                  field.handleBlur();
+                                  closeEmptyCommentEditor(item);
+                                }}
+                                rows={2}
+                                aria-label={`Comments for ${item.applicationName}`}
+                              />
+                            )}
+                          </form.Field>
                         </td>
                       </tr>
                     ) : null}
@@ -1061,13 +1097,18 @@ export default function VotingReportForm() {
             Planner&apos;s Notes
           </h2>
         </div>
-        <textarea
-          className={cn(screenFieldClass, "min-h-28 resize-y print:hidden")}
-          value={report.plannerNotes}
-          onChange={(event) => updateReportField("plannerNotes", event.target.value)}
-          rows={4}
-          placeholder="Note any themes or discussions of concern to the NPU..."
-        />
+        <form.Field name="plannerNotes">
+          {(field) => (
+            <textarea
+              className={cn(screenFieldClass, "min-h-28 resize-y print:hidden")}
+              value={field.state.value}
+              onChange={(event) => field.handleChange(event.target.value)}
+              onBlur={field.handleBlur}
+              rows={4}
+              placeholder="Note any themes or discussions of concern to the NPU..."
+            />
+          )}
+        </form.Field>
         {report.plannerNotes.trim() ? (
           <div className="hidden whitespace-pre-wrap text-sm leading-6 text-black print:block">
             {report.plannerNotes}

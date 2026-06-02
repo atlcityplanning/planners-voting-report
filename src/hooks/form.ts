@@ -11,7 +11,7 @@ import {
   Select,
   SubscribeButton,
   TextArea,
-} from "../components/design-request/form.components";
+} from "@/components/voting-report/form.components";
 
 export const { useAppForm, withForm, withFieldGroup } = createFormHook({
   fieldComponents: {
