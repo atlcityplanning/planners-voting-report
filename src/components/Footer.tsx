@@ -3,7 +3,7 @@ export default function Footer() {
     <footer className="border-t border-slate-200 px-4 py-8 text-sm text-slate-500 print:hidden">
       <div className="mx-auto w-[min(1180px,calc(100%-2rem))]">
         <p className="m-0">
-          Prepared by the{' '}
+          Prepared by the{" "}
           <a
             href="https://www.atlantaga.gov/government/departments/city-planning"
             className="font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4 transition-colors hover:text-blue-800"
@@ -16,5 +16,5 @@ export default function Footer() {
         </p>
       </div>
     </footer>
-  )
+  );
 }

@@ -7,9 +7,9 @@ import {
   Printer,
   RotateCcw,
   Trash2,
-} from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { DragEvent, FocusEvent, FormEvent, KeyboardEvent } from 'react'
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { DragEvent, FocusEvent, FormEvent, KeyboardEvent } from "react";
 import {
   INITIAL_REPORT_STATE,
   ITEM_TYPES,
@@ -22,55 +22,50 @@ import {
   normalizeItemType,
   normalizeRecommendation,
   reorderItems,
-} from '../lib/votingReport'
-import type {
-  AgendaItem,
-  ItemType,
-  Recommendation,
-  ReportFormState,
-} from '../lib/votingReport'
+} from "@/lib/votingReport";
+import type { AgendaItem, ItemType, Recommendation, ReportFormState } from "@/lib/votingReport";
 
-const STORAGE_KEY = 'npu-voting-report:v1'
+const STORAGE_KEY = "npu-voting-report:v1";
 const UPDATES_URL =
-  'https://www.atlantaga.gov/government/departments/city-planning/neighborhood-planning-units/updates'
+  "https://www.atlantaga.gov/government/departments/city-planning/neighborhood-planning-units/updates";
 
 type NewItemForm = {
-  itemType: ItemType | ''
-  applicationName: string
-  recommendation: Recommendation
-  comments: string
-}
+  itemType: ItemType | "";
+  applicationName: string;
+  recommendation: Recommendation;
+  comments: string;
+};
 
 const EMPTY_NEW_ITEM: NewItemForm = {
-  itemType: '',
-  applicationName: '',
-  recommendation: 'PENDING',
-  comments: '',
-}
+  itemType: "",
+  applicationName: "",
+  recommendation: "PENDING",
+  comments: "",
+};
 
 function createItemId() {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
   }
 
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 function readString(value: unknown) {
-  return typeof value === 'string' ? value : ''
+  return typeof value === "string" ? value : "";
 }
 
 function sanitizeItem(item: unknown): AgendaItem | null {
-  if (!item || typeof item !== 'object') {
-    return null
+  if (!item || typeof item !== "object") {
+    return null;
   }
 
-  const candidate = item as Partial<AgendaItem>
-  const itemType = normalizeItemType(readString(candidate.itemType))
-  const applicationName = readString(candidate.applicationName).trim()
+  const candidate = item as Partial<AgendaItem>;
+  const itemType = normalizeItemType(readString(candidate.itemType));
+  const applicationName = readString(candidate.applicationName).trim();
 
   if (!applicationName) {
-    return null
+    return null;
   }
 
   return {
@@ -79,13 +74,13 @@ function sanitizeItem(item: unknown): AgendaItem | null {
     applicationName,
     recommendation: normalizeRecommendation(readString(candidate.recommendation)),
     comments: readString(candidate.comments),
-  }
+  };
 }
 
 function sanitizeReport(candidate: Partial<ReportFormState>): ReportFormState {
   const items = Array.isArray(candidate.items)
     ? candidate.items.map(sanitizeItem).filter((item) => item !== null)
-    : []
+    : [];
 
   return {
     ...INITIAL_REPORT_STATE,
@@ -95,74 +90,68 @@ function sanitizeReport(candidate: Partial<ReportFormState>): ReportFormState {
     planner: readString(candidate.planner),
     meetingDate: readString(candidate.meetingDate),
     autofill:
-      typeof candidate.autofill === 'boolean'
-        ? candidate.autofill
-        : INITIAL_REPORT_STATE.autofill,
+      typeof candidate.autofill === "boolean" ? candidate.autofill : INITIAL_REPORT_STATE.autofill,
     plannerNotes: readString(candidate.plannerNotes),
     items,
-  }
+  };
 }
 
 function parseLegacyItems(serializedItems: string | null): Array<AgendaItem> {
-  if (!serializedItems || typeof DOMParser === 'undefined') {
-    return []
+  if (!serializedItems || typeof DOMParser === "undefined") {
+    return [];
   }
 
   try {
-    const html = JSON.parse(serializedItems) as unknown
-    if (typeof html !== 'string') {
-      return []
+    const html = JSON.parse(serializedItems) as unknown;
+    if (typeof html !== "string") {
+      return [];
     }
 
-    const documentFragment = new DOMParser().parseFromString(
-      `<table>${html}</table>`,
-      'text/html',
-    )
+    const documentFragment = new DOMParser().parseFromString(`<table>${html}</table>`, "text/html");
 
-    return Array.from(documentFragment.querySelectorAll('tbody'))
+    return Array.from(documentFragment.querySelectorAll("tbody"))
       .map((body) => {
-        const rows = Array.from(body.querySelectorAll('tr'))
-        const cells = Array.from(rows[0]?.querySelectorAll('td') ?? [])
-        const applicationName = cells[1]?.textContent?.trim() ?? ''
+        const rows = Array.from(body.querySelectorAll("tr"));
+        const cells = Array.from(rows[0]?.querySelectorAll("td") ?? []);
+        const applicationName = cells[1]?.textContent?.trim() ?? "";
 
         if (!applicationName) {
-          return null
+          return null;
         }
 
         return {
           id: createItemId(),
-          itemType: normalizeItemType(cells[0]?.textContent?.trim() ?? ''),
+          itemType: normalizeItemType(cells[0]?.textContent?.trim() ?? ""),
           applicationName,
-          recommendation: normalizeRecommendation(
-            cells[2]?.textContent?.trim() ?? 'PENDING',
-          ),
-          comments: rows[1]?.textContent?.trim() ?? '',
-        }
+          recommendation: normalizeRecommendation(cells[2]?.textContent?.trim() ?? "PENDING"),
+          comments: rows[1]?.textContent?.trim() ?? "",
+        };
       })
-      .filter((item) => item !== null)
+      .filter((item) => item !== null);
   } catch {
-    return []
+    return [];
   }
 }
 
 function loadStoredReport(): ReportFormState {
-  if (typeof window === 'undefined') {
-    return INITIAL_REPORT_STATE
+  if (typeof window === "undefined") {
+    return INITIAL_REPORT_STATE;
   }
 
-  const storedReport = window.localStorage.getItem(STORAGE_KEY)
+  const storedReport = window.localStorage.getItem(STORAGE_KEY);
   if (storedReport) {
     try {
-      return sanitizeReport(JSON.parse(storedReport) as Partial<ReportFormState>)
+      return sanitizeReport(JSON.parse(storedReport) as Partial<ReportFormState>);
     } catch {
-      window.localStorage.removeItem(STORAGE_KEY)
+      window.localStorage.removeItem(STORAGE_KEY);
     }
   }
 
   try {
-    const legacyData = JSON.parse(
-      window.localStorage.getItem('data') ?? '{}',
-    ) as Record<string, unknown>
+    const legacyData = JSON.parse(window.localStorage.getItem("data") ?? "{}") as Record<
+      string,
+      unknown
+    >;
 
     return sanitizeReport({
       npu: readString(legacyData.NPU),
@@ -170,164 +159,149 @@ function loadStoredReport(): ReportFormState {
       location: readString(legacyData.loc),
       planner: readString(legacyData.planner),
       autofill:
-        typeof legacyData.fillToggle === 'boolean'
+        typeof legacyData.fillToggle === "boolean"
           ? legacyData.fillToggle
           : INITIAL_REPORT_STATE.autofill,
-      plannerNotes: window.localStorage.getItem('pNotes') ?? '',
-      items: parseLegacyItems(window.localStorage.getItem('items')),
-    })
+      plannerNotes: window.localStorage.getItem("pNotes") ?? "",
+      items: parseLegacyItems(window.localStorage.getItem("items")),
+    });
   } catch {
-    return INITIAL_REPORT_STATE
+    return INITIAL_REPORT_STATE;
   }
 }
 
 export default function VotingReportForm() {
-  const [report, setReport] = useState<ReportFormState>(INITIAL_REPORT_STATE)
-  const [newItem, setNewItem] = useState<NewItemForm>(EMPTY_NEW_ITEM)
-  const [hasLoadedStorage, setHasLoadedStorage] = useState(false)
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dialogMessage, setDialogMessage] = useState('')
-  const [copiedUpdatesLink, setCopiedUpdatesLink] = useState(false)
-  const [openCommentIds, setOpenCommentIds] = useState<Array<string>>([])
-  const dialogRef = useRef<HTMLDialogElement>(null)
-  const dateInputRef = useRef<HTMLInputElement>(null)
+  const [report, setReport] = useState<ReportFormState>(INITIAL_REPORT_STATE);
+  const [newItem, setNewItem] = useState<NewItemForm>(EMPTY_NEW_ITEM);
+  const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dialogMessage, setDialogMessage] = useState("");
+  const [copiedUpdatesLink, setCopiedUpdatesLink] = useState(false);
+  const [openCommentIds, setOpenCommentIds] = useState<Array<string>>([]);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const printLabels = useMemo(
     () => getReportPrintLabels(report.npu, report.meetingDate),
     [report.meetingDate, report.npu],
-  )
-  const plannerScriptUrl = useMemo(
-    () => getPlannerScriptUrl(report.npu),
-    [report.npu],
-  )
+  );
+  const plannerScriptUrl = useMemo(() => getPlannerScriptUrl(report.npu), [report.npu]);
   const pendingCount = useMemo(
-    () =>
-      report.items.filter((item) => item.recommendation === 'PENDING').length,
+    () => report.items.filter((item) => item.recommendation === "PENDING").length,
     [report.items],
-  )
-  const reportTitle = report.meetingDate
-    ? printLabels.headerTitle
-    : 'VOTING REPORT'
+  );
+  const reportTitle = report.meetingDate ? printLabels.headerTitle : "VOTING REPORT";
 
   useEffect(() => {
-    setReport(loadStoredReport())
-    setHasLoadedStorage(true)
-  }, [])
+    setReport(loadStoredReport());
+    setHasLoadedStorage(true);
+  }, []);
 
   useEffect(() => {
     if (!hasLoadedStorage) {
-      return
+      return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(report))
-  }, [hasLoadedStorage, report])
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(report));
+  }, [hasLoadedStorage, report]);
 
   useEffect(() => {
     if (!copiedUpdatesLink) {
-      return
+      return;
     }
 
-    const timeout = window.setTimeout(() => setCopiedUpdatesLink(false), 1200)
-    return () => window.clearTimeout(timeout)
-  }, [copiedUpdatesLink])
+    const timeout = window.setTimeout(() => setCopiedUpdatesLink(false), 1200);
+    return () => window.clearTimeout(timeout);
+  }, [copiedUpdatesLink]);
 
   useEffect(() => {
     function beforePrint() {
       if (report.meetingDate) {
-        document.title = printLabels.documentTitle
+        document.title = printLabels.documentTitle;
       }
     }
 
     function afterPrint() {
-      document.title = "Planner's Voting Report"
+      document.title = "Planner's Voting Report";
     }
 
-    window.addEventListener('beforeprint', beforePrint)
-    window.addEventListener('afterprint', afterPrint)
+    window.addEventListener("beforeprint", beforePrint);
+    window.addEventListener("afterprint", afterPrint);
 
     return () => {
-      window.removeEventListener('beforeprint', beforePrint)
-      window.removeEventListener('afterprint', afterPrint)
-    }
-  }, [printLabels.documentTitle, report.meetingDate])
+      window.removeEventListener("beforeprint", beforePrint);
+      window.removeEventListener("afterprint", afterPrint);
+    };
+  }, [printLabels.documentTitle, report.meetingDate]);
 
   function showDialog(message: string) {
-    setDialogMessage(message)
-    window.requestAnimationFrame(() => dialogRef.current?.showModal())
+    setDialogMessage(message);
+    window.requestAnimationFrame(() => dialogRef.current?.showModal());
   }
 
-  function updateReportField<K extends keyof ReportFormState>(
-    field: K,
-    value: ReportFormState[K],
-  ) {
+  function updateReportField<K extends keyof ReportFormState>(field: K, value: ReportFormState[K]) {
     setReport((currentReport) => ({
       ...currentReport,
       [field]: value,
-    }))
+    }));
   }
 
   function updateItem(id: string, patch: Partial<AgendaItem>) {
     setReport((currentReport) => ({
       ...currentReport,
-      items: currentReport.items.map((item) =>
-        item.id === id ? { ...item, ...patch } : item,
-      ),
-    }))
+      items: currentReport.items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    }));
   }
 
   function handleAutofillChange(autofill: boolean) {
-    updateReportField('autofill', autofill)
+    updateReportField("autofill", autofill);
     setNewItem((currentItem) => {
       if (!currentItem.itemType) {
-        return currentItem
+        return currentItem;
       }
 
-      const defaults = getApplicationDefaults(currentItem.itemType, autofill)
+      const defaults = getApplicationDefaults(currentItem.itemType, autofill);
       return {
         ...currentItem,
         applicationName: defaults.value,
         recommendation: defaults.recommendation ?? currentItem.recommendation,
-      }
-    })
+      };
+    });
   }
 
   function handleNewItemTypeChange(itemTypeValue: string) {
-    const itemType = normalizeItemType(itemTypeValue)
-    const defaults = getApplicationDefaults(itemType, report.autofill)
+    const itemType = normalizeItemType(itemTypeValue);
+    const defaults = getApplicationDefaults(itemType, report.autofill);
 
     setNewItem({
       itemType,
       applicationName: defaults.value,
-      recommendation: defaults.recommendation ?? 'PENDING',
-      comments: '',
-    })
+      recommendation: defaults.recommendation ?? "PENDING",
+      comments: "",
+    });
   }
 
   function handleNewApplicationName(value: string) {
-    const defaults = getApplicationDefaults(newItem.itemType, report.autofill)
+    const defaults = getApplicationDefaults(newItem.itemType, report.autofill);
     setNewItem((currentItem) => ({
       ...currentItem,
-      applicationName: applyApplicationTemplate(
-        value,
-        defaults.template,
-        report.autofill,
-      ),
-    }))
+      applicationName: applyApplicationTemplate(value, defaults.template, report.autofill),
+    }));
   }
 
   function moveCursorToEnd(event: FocusEvent<HTMLInputElement>) {
-    const input = event.currentTarget
+    const input = event.currentTarget;
     window.requestAnimationFrame(() => {
-      input.setSelectionRange(input.value.length, input.value.length)
-    })
+      input.setSelectionRange(input.value.length, input.value.length);
+    });
   }
 
   function handleAddItem(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
+    event.preventDefault();
 
     if (!newItem.itemType || !newItem.applicationName.trim()) {
-      showDialog('Please enter an item type and application name.')
-      return
+      showDialog("Please enter an item type and application name.");
+      return;
     }
 
     const item: AgendaItem = {
@@ -336,119 +310,109 @@ export default function VotingReportForm() {
       applicationName: newItem.applicationName.trim(),
       recommendation: newItem.recommendation,
       comments: newItem.comments.trim(),
-    }
+    };
 
     setReport((currentReport) => ({
       ...currentReport,
       items: [...currentReport.items, item],
-    }))
-    setNewItem(EMPTY_NEW_ITEM)
+    }));
+    setNewItem(EMPTY_NEW_ITEM);
   }
 
   function handleClearTable() {
-    if (
-      report.items.length > 0 &&
-      !window.confirm('Clear all agenda items and planner notes?')
-    ) {
-      return
+    if (report.items.length > 0 && !window.confirm("Clear all agenda items and planner notes?")) {
+      return;
     }
 
     setReport((currentReport) => ({
       ...currentReport,
       items: [],
-      plannerNotes: '',
-    }))
-    setOpenCommentIds([])
+      plannerNotes: "",
+    }));
+    setOpenCommentIds([]);
   }
 
   function handleDeleteItem(itemId: string) {
-    if (!window.confirm('Delete this agenda item?')) {
-      return
+    if (!window.confirm("Delete this agenda item?")) {
+      return;
     }
 
     setReport((currentReport) => ({
       ...currentReport,
       items: currentReport.items.filter((item) => item.id !== itemId),
-    }))
+    }));
   }
 
-  function handleApplicationKeyDown(
-    item: AgendaItem,
-    event: KeyboardEvent<HTMLInputElement>,
-  ) {
-    if (event.key === 'Tab' && !item.comments.trim()) {
-      openCommentEditor(item.id)
+  function handleApplicationKeyDown(item: AgendaItem, event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Tab" && !item.comments.trim()) {
+      openCommentEditor(item.id);
     }
   }
 
   function openCommentEditor(itemId: string) {
     setOpenCommentIds((currentIds) =>
       currentIds.includes(itemId) ? currentIds : [...currentIds, itemId],
-    )
+    );
   }
 
   function closeEmptyCommentEditor(item: AgendaItem) {
     if (item.comments.trim()) {
-      return
+      return;
     }
 
-    setOpenCommentIds((currentIds) =>
-      currentIds.filter((itemId) => itemId !== item.id),
-    )
+    setOpenCommentIds((currentIds) => currentIds.filter((itemId) => itemId !== item.id));
   }
 
   function handleDragStart(itemId: string, event: DragEvent<HTMLElement>) {
-    setDraggingId(itemId)
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', itemId)
+    setDraggingId(itemId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", itemId);
   }
 
   function handleDragOver(event: DragEvent<HTMLElement>) {
-    event.preventDefault()
-    event.dataTransfer.dropEffect = 'move'
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
   }
 
   function handleDrop(overId: string, event: DragEvent<HTMLElement>) {
-    event.preventDefault()
-    const activeId = draggingId ?? event.dataTransfer.getData('text/plain')
+    event.preventDefault();
+    const activeId = draggingId ?? event.dataTransfer.getData("text/plain");
 
     if (!activeId) {
-      return
+      return;
     }
 
     setReport((currentReport) => ({
       ...currentReport,
       items: reorderItems(currentReport.items, activeId, overId),
-    }))
-    setDraggingId(null)
+    }));
+    setDraggingId(null);
   }
 
   async function copyUpdatesLink() {
     try {
-      await navigator.clipboard.writeText(UPDATES_URL)
-      setCopiedUpdatesLink(true)
+      await navigator.clipboard.writeText(UPDATES_URL);
+      setCopiedUpdatesLink(true);
     } catch {
-      showDialog('Unable to copy the updates link from this browser.')
+      showDialog("Unable to copy the updates link from this browser.");
     }
   }
 
   function handlePrint() {
     if (!report.meetingDate) {
-      dateInputRef.current?.focus()
-      dateInputRef.current?.showPicker?.()
-      return
+      dateInputRef.current?.focus();
+      dateInputRef.current?.showPicker?.();
+      return;
     }
 
     if (
       pendingCount > 0 &&
-      !window.confirm(
-        'Some items do not have recommendations. Print the report anyway?',
-      )
+      !window.confirm("Some items do not have recommendations. Print the report anyway?")
     ) {
-      return
+      return;
     }
 
-    window.print()
+    window.print();
   }
 
   return (
@@ -516,7 +480,7 @@ export default function VotingReportForm() {
             Report Details
           </h2>
           <span className="text-xs font-bold text-slate-500 print:hidden">
-            {hasLoadedStorage ? 'Saved locally' : 'Loading saved form'}
+            {hasLoadedStorage ? "Saved locally" : "Loading saved form"}
           </span>
         </div>
 
@@ -528,7 +492,7 @@ export default function VotingReportForm() {
             <select
               className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
               value={report.npu}
-              onChange={(event) => updateReportField('npu', event.target.value)}
+              onChange={(event) => updateReportField("npu", event.target.value)}
             >
               {NPU_OPTIONS.map((npu) => (
                 <option key={npu} value={npu}>
@@ -544,9 +508,7 @@ export default function VotingReportForm() {
             <input
               className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
               value={report.chair}
-              onChange={(event) =>
-                updateReportField('chair', event.target.value)
-              }
+              onChange={(event) => updateReportField("chair", event.target.value)}
               type="text"
             />
           </label>
@@ -558,9 +520,7 @@ export default function VotingReportForm() {
               ref={dateInputRef}
               className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
               value={report.meetingDate}
-              onChange={(event) =>
-                updateReportField('meetingDate', event.target.value)
-              }
+              onChange={(event) => updateReportField("meetingDate", event.target.value)}
               type="date"
               required
             />
@@ -572,9 +532,7 @@ export default function VotingReportForm() {
             <input
               className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
               value={report.location}
-              onChange={(event) =>
-                updateReportField('location', event.target.value)
-              }
+              onChange={(event) => updateReportField("location", event.target.value)}
               type="text"
             />
           </label>
@@ -585,9 +543,7 @@ export default function VotingReportForm() {
             <input
               className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0"
               value={report.planner}
-              onChange={(event) =>
-                updateReportField('planner', event.target.value)
-              }
+              onChange={(event) => updateReportField("planner", event.target.value)}
               type="text"
             />
           </label>
@@ -655,9 +611,8 @@ export default function VotingReportForm() {
               onFocus={moveCursorToEnd}
               placeholder={
                 newItem.itemType
-                  ? getApplicationDefaults(newItem.itemType, report.autofill)
-                      .placeholder
-                  : 'Application number or name'
+                  ? getApplicationDefaults(newItem.itemType, report.autofill).placeholder
+                  : "Application number or name"
               }
               type="text"
               autoComplete="off"
@@ -682,7 +637,7 @@ export default function VotingReportForm() {
                 <option
                   key={recommendation.value}
                   value={recommendation.value}
-                  disabled={recommendation.value === 'PENDING'}
+                  disabled={recommendation.value === "PENDING"}
                 >
                   {recommendation.label}
                 </option>
@@ -720,7 +675,10 @@ export default function VotingReportForm() {
         aria-labelledby="agenda-heading"
       >
         <div className="flex items-center justify-between gap-4 border-b border-slate-200 p-4 print:border-0 print:p-0 print:pb-2">
-          <h2 id="agenda-heading" className="m-0 text-base font-extrabold text-slate-950 print:text-black">
+          <h2
+            id="agenda-heading"
+            className="m-0 text-base font-extrabold text-slate-950 print:text-black"
+          >
             Agenda Items
           </h2>
           <span className="text-xs font-bold text-slate-500 print:text-black">
@@ -759,14 +717,13 @@ export default function VotingReportForm() {
               </tbody>
             ) : (
               report.items.map((item) => {
-                const showComments =
-                  item.comments.trim() || openCommentIds.includes(item.id)
+                const showComments = item.comments.trim() || openCommentIds.includes(item.id);
 
                 return (
                   <tbody
                     key={item.id}
                     className={`break-inside-avoid odd:bg-white even:bg-slate-50/70 ${
-                      draggingId === item.id ? 'opacity-50' : ''
+                      draggingId === item.id ? "opacity-50" : ""
                     }`}
                     draggable
                     onDragStart={(event) => handleDragStart(item.id, event)}
@@ -782,7 +739,7 @@ export default function VotingReportForm() {
                             className="text-slate-400 print:hidden"
                             size={18}
                           />
-                        <span>{item.itemType}</span>
+                          <span>{item.itemType}</span>
                         </span>
                       </td>
                       <td className="border-b border-slate-200 px-3 py-2 print:border print:border-neutral-600 print:px-2 print:py-1">
@@ -794,34 +751,27 @@ export default function VotingReportForm() {
                               applicationName: event.target.value,
                             })
                           }
-                          onKeyDown={(event) =>
-                            handleApplicationKeyDown(item, event)
-                          }
+                          onKeyDown={(event) => handleApplicationKeyDown(item, event)}
                           aria-label={`Application name for ${item.itemType}`}
                         />
                       </td>
                       <td className="border-b border-slate-200 px-3 py-2 text-right print:border print:border-neutral-600 print:px-2 print:py-1">
                         <select
                           className={`w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-right outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100 print:border-0 print:bg-transparent print:p-0 print:ring-0 ${
-                            item.recommendation === 'PENDING'
-                              ? 'font-bold text-amber-700'
-                              : 'text-slate-950'
+                            item.recommendation === "PENDING"
+                              ? "font-bold text-amber-700"
+                              : "text-slate-950"
                           }`}
                           value={item.recommendation}
                           onChange={(event) =>
                             updateItem(item.id, {
-                              recommendation: normalizeRecommendation(
-                                event.target.value,
-                              ),
+                              recommendation: normalizeRecommendation(event.target.value),
                             })
                           }
                           aria-label={`Recommendation for ${item.applicationName}`}
                         >
                           {RECOMMENDATIONS.map((recommendation) => (
-                            <option
-                              key={recommendation.value}
-                              value={recommendation.value}
-                            >
+                            <option key={recommendation.value} value={recommendation.value}>
                               {recommendation.label}
                             </option>
                           ))}
@@ -829,24 +779,24 @@ export default function VotingReportForm() {
                       </td>
                       <td className="border-b border-slate-200 px-3 py-2 text-right print:hidden">
                         <div className="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-blue-200 hover:bg-slate-50 hover:text-blue-700"
-                          onClick={() => openCommentEditor(item.id)}
-                          aria-label={`Add comments for ${item.applicationName}`}
-                          title="Add comments"
-                        >
-                          <MessageSquarePlus aria-hidden="true" size={18} />
-                        </button>
-                        <button
-                          type="button"
-                          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => handleDeleteItem(item.id)}
-                          aria-label={`Delete ${item.applicationName}`}
-                          title="Delete item"
-                        >
-                          <Trash2 aria-hidden="true" size={18} />
-                        </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-blue-200 hover:bg-slate-50 hover:text-blue-700"
+                            onClick={() => openCommentEditor(item.id)}
+                            aria-label={`Add comments for ${item.applicationName}`}
+                            title="Add comments"
+                          >
+                            <MessageSquarePlus aria-hidden="true" size={18} />
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => handleDeleteItem(item.id)}
+                            aria-label={`Delete ${item.applicationName}`}
+                            title="Delete item"
+                          >
+                            <Trash2 aria-hidden="true" size={18} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -856,8 +806,8 @@ export default function VotingReportForm() {
                           colSpan={4}
                           className={
                             item.comments.trim()
-                              ? 'border-b border-slate-200 bg-slate-50 px-3 py-2 print:border print:border-neutral-600 print:bg-white print:px-2 print:py-1'
-                              : 'border-b border-slate-200 bg-slate-50 px-3 py-2 print:hidden'
+                              ? "border-b border-slate-200 bg-slate-50 px-3 py-2 print:border print:border-neutral-600 print:bg-white print:px-2 print:py-1"
+                              : "border-b border-slate-200 bg-slate-50 px-3 py-2 print:hidden"
                           }
                         >
                           <textarea
@@ -876,7 +826,7 @@ export default function VotingReportForm() {
                       </tr>
                     ) : null}
                   </tbody>
-                )
+                );
               })
             )}
           </table>
@@ -895,9 +845,7 @@ export default function VotingReportForm() {
         <textarea
           className="min-h-28 w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-950 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-blue-400 focus:ring-4 focus:ring-blue-100 print:hidden"
           value={report.plannerNotes}
-          onChange={(event) =>
-            updateReportField('plannerNotes', event.target.value)
-          }
+          onChange={(event) => updateReportField("plannerNotes", event.target.value)}
           rows={4}
           placeholder="Note any themes or discussions of concern to the NPU..."
         />
@@ -936,14 +884,11 @@ export default function VotingReportForm() {
           onClick={copyUpdatesLink}
         >
           <Clipboard aria-hidden="true" size={16} />
-          {copiedUpdatesLink ? 'Copied' : 'Copy Updates Link'}
+          {copiedUpdatesLink ? "Copied" : "Copy Updates Link"}
         </button>
       </section>
 
-      <section
-        className="mt-6 hidden grid-cols-2 gap-4 print:grid"
-        aria-label="Signatures"
-      >
+      <section className="mt-6 hidden grid-cols-2 gap-4 print:grid" aria-label="Signatures">
         <div className="rounded-lg border border-neutral-600 p-4">
           <label className="mt-2 block font-bold" htmlFor="chairS">
             Chair Signature:
@@ -982,5 +927,5 @@ export default function VotingReportForm() {
         </div>
       </section>
     </main>
-  )
+  );
 }

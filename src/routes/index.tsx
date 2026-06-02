@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
-import VotingReportForm from '../components/voting-report-form'
+import { createFileRoute } from "@tanstack/react-router";
+import VotingReportForm from "@/components/voting-report-form";
 
-export const Route = createFileRoute('/')({ component: VotingReportForm })
+export const Route = createFileRoute("/")({ component: VotingReportForm });
