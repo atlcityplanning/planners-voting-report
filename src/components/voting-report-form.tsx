@@ -3,10 +3,13 @@ import {
   Clipboard,
   ExternalLink,
   GripVertical,
+  LayoutDashboard,
+  Mail,
   MessageSquarePlus,
   Plus,
   Printer,
   RotateCcw,
+  Send,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -25,6 +28,9 @@ import {
   reorderItems,
 } from "@/lib/votingReport";
 import type { AgendaItem, ItemType, Recommendation, ReportFormState } from "@/lib/votingReport";
+import { NPU_CONTACT_SOURCE, getNpuContactDefault } from "@/lib/npuContactDirectory";
+import type { SubmissionRecipients } from "@/lib/votingReportWorkflow";
+import { getSubmissionRecipients, submitForReview } from "@/server/reportActions";
 import { cn } from "@/utils/cn";
 
 const STORAGE_KEY = "npu-voting-report:v1";
@@ -43,6 +49,12 @@ const EMPTY_NEW_ITEM: NewItemForm = {
   applicationName: "",
   recommendation: "PENDING",
   comments: "",
+};
+
+const EMPTY_SUBMISSION_RECIPIENTS: SubmissionRecipients = {
+  chairEmail: "",
+  plannerEmail: "",
+  npuTeamEmail: "",
 };
 
 const labelClass = "text-[10px] font-bold uppercase tracking-wide text-muted-foreground";
@@ -193,6 +205,19 @@ function loadStoredReport(): ReportFormState {
   }
 }
 
+function applyContactDefaults(report: ReportFormState, mode: "fill-empty" | "replace") {
+  const defaults = getNpuContactDefault(report.npu);
+  if (!defaults) {
+    return report;
+  }
+
+  return {
+    ...report,
+    chair: mode === "replace" || !report.chair.trim() ? defaults.chairName : report.chair,
+    planner: mode === "replace" || !report.planner.trim() ? defaults.plannerName : report.planner,
+  };
+}
+
 export default function VotingReportForm() {
   const [report, setReport] = useState<ReportFormState>(INITIAL_REPORT_STATE);
   const [newItem, setNewItem] = useState<NewItemForm>(EMPTY_NEW_ITEM);
@@ -201,7 +226,15 @@ export default function VotingReportForm() {
   const [dialogMessage, setDialogMessage] = useState("");
   const [copiedUpdatesLink, setCopiedUpdatesLink] = useState(false);
   const [openCommentIds, setOpenCommentIds] = useState<Array<string>>([]);
+  const [submissionRecipients, setSubmissionRecipients] = useState<SubmissionRecipients>(
+    EMPTY_SUBMISSION_RECIPIENTS,
+  );
+  const [isPreparingSubmission, setIsPreparingSubmission] = useState(false);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [submissionMessage, setSubmissionMessage] = useState("");
+  const [submittedReportId, setSubmittedReportId] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const submissionDialogRef = useRef<HTMLDialogElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const printLabels = useMemo(
@@ -216,7 +249,7 @@ export default function VotingReportForm() {
   const reportTitle = report.meetingDate ? printLabels.headerTitle : "VOTING REPORT";
 
   useEffect(() => {
-    setReport(loadStoredReport());
+    setReport(applyContactDefaults(loadStoredReport(), "fill-empty"));
     setHasLoadedStorage(true);
   }, []);
 
@@ -267,6 +300,19 @@ export default function VotingReportForm() {
       ...currentReport,
       [field]: value,
     }));
+  }
+
+  function handleNpuChange(npu: string) {
+    setReport((currentReport) =>
+      applyContactDefaults(
+        {
+          ...currentReport,
+          npu,
+        },
+        "replace",
+      ),
+    );
+    setSubmittedReportId("");
   }
 
   function updateItem(id: string, patch: Partial<AgendaItem>) {
@@ -438,6 +484,65 @@ export default function VotingReportForm() {
     window.print();
   }
 
+  async function prepareSubmission() {
+    if (!report.meetingDate) {
+      dateInputRef.current?.focus();
+      dateInputRef.current?.showPicker?.();
+      return;
+    }
+
+    if (
+      pendingCount > 0 &&
+      !window.confirm("Some items do not have recommendations. Submit the report anyway?")
+    ) {
+      return;
+    }
+
+    setIsPreparingSubmission(true);
+    setSubmissionMessage("");
+    try {
+      const recipients = await getSubmissionRecipients({
+        data: {
+          npu: report.npu,
+        },
+      });
+      setSubmissionRecipients(recipients);
+      window.requestAnimationFrame(() => submissionDialogRef.current?.showModal());
+    } catch (error) {
+      showDialog(error instanceof Error ? error.message : "Unable to prepare submission.");
+    } finally {
+      setIsPreparingSubmission(false);
+    }
+  }
+
+  async function handleSubmitForReview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmittingReport(true);
+    setSubmissionMessage("");
+
+    try {
+      const submittedReport = await submitForReview({
+        data: {
+          reportId: submittedReportId || undefined,
+          report,
+          recipients: submissionRecipients,
+        },
+      });
+
+      if (!submittedReport) {
+        throw new Error("Submission did not return a report.");
+      }
+
+      setSubmittedReportId(submittedReport.id);
+      setReport(submittedReport.report);
+      setSubmissionMessage("Submitted for review. Notification attempts were logged.");
+    } catch (error) {
+      setSubmissionMessage(error instanceof Error ? error.message : "Unable to submit report.");
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  }
+
   return (
     <main className="mx-auto w-[min(1180px,calc(100%-2rem))] py-8 print:w-full print:py-0">
       <dialog
@@ -452,6 +557,97 @@ export default function VotingReportForm() {
         >
           OK
         </button>
+      </dialog>
+
+      <dialog
+        ref={submissionDialogRef}
+        className="w-[min(36rem,calc(100%-2rem))] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-foreground/40"
+      >
+        <div className="mb-5">
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            Submit For Review
+          </p>
+          <h2 className="m-0 text-xl font-extrabold text-foreground">
+            Confirm submission recipients
+          </h2>
+        </div>
+        <form className="grid gap-4" onSubmit={handleSubmitForReview}>
+          <label className="grid gap-1">
+            <span className={labelClass}>NPU Chair Email</span>
+            <input
+              className={screenFieldClass}
+              value={submissionRecipients.chairEmail}
+              onChange={(event) =>
+                setSubmissionRecipients((currentRecipients) => ({
+                  ...currentRecipients,
+                  chairEmail: event.target.value,
+                }))
+              }
+              type="email"
+              required
+            />
+          </label>
+          <label className="grid gap-1">
+            <span className={labelClass}>NPU Team Email</span>
+            <input
+              className={screenFieldClass}
+              value={submissionRecipients.npuTeamEmail}
+              onChange={(event) =>
+                setSubmissionRecipients((currentRecipients) => ({
+                  ...currentRecipients,
+                  npuTeamEmail: event.target.value,
+                }))
+              }
+              type="email"
+              required
+            />
+          </label>
+          <label className="grid gap-1">
+            <span className={labelClass}>Planner CC</span>
+            <input
+              className={screenFieldClass}
+              value={submissionRecipients.plannerEmail}
+              onChange={(event) =>
+                setSubmissionRecipients((currentRecipients) => ({
+                  ...currentRecipients,
+                  plannerEmail: event.target.value,
+                }))
+              }
+              type="email"
+            />
+          </label>
+          {submissionMessage ? (
+            <p className="m-0 rounded-xl bg-muted px-3 py-2 text-sm font-semibold text-muted-foreground">
+              {submissionMessage}
+            </p>
+          ) : null}
+          {submittedReportId ? (
+            <a
+              className={cn(subtleButtonClass, "no-underline")}
+              href={`/dashboard/${submittedReportId}`}
+            >
+              <LayoutDashboard aria-hidden="true" size={18} />
+              Open Report Dashboard
+            </a>
+          ) : null}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              className={subtleButtonClass}
+              onClick={() => submissionDialogRef.current?.close()}
+            >
+              Close
+            </button>
+            <button
+              type="submit"
+              className={primaryButtonClass}
+              disabled={isSubmittingReport}
+            >
+              <Send aria-hidden="true" size={18} />
+              {isSubmittingReport ? "Submitting" : "Submit for Review"}
+            </button>
+          </div>
+        </form>
       </dialog>
 
       <header className="mb-6 print:mb-6">
@@ -489,6 +685,15 @@ export default function VotingReportForm() {
               <Printer aria-hidden="true" size={18} />
               Print
             </button>
+            <button
+              type="button"
+              className={cn(primaryButtonClass, "sm:min-w-32")}
+              onClick={prepareSubmission}
+              disabled={isPreparingSubmission}
+            >
+              <Mail aria-hidden="true" size={18} />
+              {isPreparingSubmission ? "Preparing" : "Submit"}
+            </button>
           </div>
         </div>
       </header>
@@ -513,7 +718,7 @@ export default function VotingReportForm() {
               <select
                 className={selectFieldClass}
                 value={report.npu}
-                onChange={(event) => updateReportField("npu", event.target.value)}
+                onChange={(event) => handleNpuChange(event.target.value)}
               >
                 {NPU_OPTIONS.map((npu) => (
                   <option key={npu} value={npu}>
@@ -577,6 +782,10 @@ export default function VotingReportForm() {
             />
           </label>
         </div>
+        <p className="m-0 mt-3 text-xs font-semibold text-muted-foreground print:hidden">
+          Chair and planner defaults use the {NPU_CONTACT_SOURCE.version} contact list, revised{" "}
+          {NPU_CONTACT_SOURCE.revisedOn}. Saved reports keep their submitted names.
+        </p>
       </section>
 
       <section

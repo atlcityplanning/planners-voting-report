@@ -11,6 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReviewTokenRouteImport } from './routes/review.$token'
+import { Route as DashboardReportIdRouteImport } from './routes/dashboard.$reportId'
+import { Route as AuthorizeTokenRouteImport } from './routes/authorize.$token'
+import { Route as ReportsReportIdPrintRouteImport } from './routes/reports.$reportId.print'
 
 const AboutRoute = AboutRouteImport.update({
   id: '/about',
@@ -22,31 +26,86 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReviewTokenRoute = ReviewTokenRouteImport.update({
+  id: '/review/$token',
+  path: '/review/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardReportIdRoute = DashboardReportIdRouteImport.update({
+  id: '/dashboard/$reportId',
+  path: '/dashboard/$reportId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthorizeTokenRoute = AuthorizeTokenRouteImport.update({
+  id: '/authorize/$token',
+  path: '/authorize/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsReportIdPrintRoute = ReportsReportIdPrintRouteImport.update({
+  id: '/reports/$reportId/print',
+  path: '/reports/$reportId/print',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/authorize/$token': typeof AuthorizeTokenRoute
+  '/dashboard/$reportId': typeof DashboardReportIdRoute
+  '/review/$token': typeof ReviewTokenRoute
+  '/reports/$reportId/print': typeof ReportsReportIdPrintRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/authorize/$token': typeof AuthorizeTokenRoute
+  '/dashboard/$reportId': typeof DashboardReportIdRoute
+  '/review/$token': typeof ReviewTokenRoute
+  '/reports/$reportId/print': typeof ReportsReportIdPrintRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/authorize/$token': typeof AuthorizeTokenRoute
+  '/dashboard/$reportId': typeof DashboardReportIdRoute
+  '/review/$token': typeof ReviewTokenRoute
+  '/reports/$reportId/print': typeof ReportsReportIdPrintRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/authorize/$token'
+    | '/dashboard/$reportId'
+    | '/review/$token'
+    | '/reports/$reportId/print'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about'
-  id: '__root__' | '/' | '/about'
+  to:
+    | '/'
+    | '/about'
+    | '/authorize/$token'
+    | '/dashboard/$reportId'
+    | '/review/$token'
+    | '/reports/$reportId/print'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/authorize/$token'
+    | '/dashboard/$reportId'
+    | '/review/$token'
+    | '/reports/$reportId/print'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  AuthorizeTokenRoute: typeof AuthorizeTokenRoute
+  DashboardReportIdRoute: typeof DashboardReportIdRoute
+  ReviewTokenRoute: typeof ReviewTokenRoute
+  ReportsReportIdPrintRoute: typeof ReportsReportIdPrintRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +124,44 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/review/$token': {
+      id: '/review/$token'
+      path: '/review/$token'
+      fullPath: '/review/$token'
+      preLoaderRoute: typeof ReviewTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/$reportId': {
+      id: '/dashboard/$reportId'
+      path: '/dashboard/$reportId'
+      fullPath: '/dashboard/$reportId'
+      preLoaderRoute: typeof DashboardReportIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/authorize/$token': {
+      id: '/authorize/$token'
+      path: '/authorize/$token'
+      fullPath: '/authorize/$token'
+      preLoaderRoute: typeof AuthorizeTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports/$reportId/print': {
+      id: '/reports/$reportId/print'
+      path: '/reports/$reportId/print'
+      fullPath: '/reports/$reportId/print'
+      preLoaderRoute: typeof ReportsReportIdPrintRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  AuthorizeTokenRoute: AuthorizeTokenRoute,
+  DashboardReportIdRoute: DashboardReportIdRoute,
+  ReviewTokenRoute: ReviewTokenRoute,
+  ReportsReportIdPrintRoute: ReportsReportIdPrintRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

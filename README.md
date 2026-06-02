@@ -45,11 +45,18 @@ This project uses the Cloudflare Vite plugin (configured in `vite.config.ts`) an
 
 1. Install Wrangler: `npm install -g wrangler`
 2. Authenticate: `wrangler login`
-3. Deploy: `bun run deploy`
+3. Create the D1 database: `wrangler d1 create npu-planners-voting-report`
+4. Replace the placeholder `database_id` in `wrangler.jsonc` with the ID returned by Wrangler.
+5. Apply the database migration: `wrangler d1 migrations apply npu-planners-voting-report`
+6. Enable Cloudflare Email Sending for the configured sender domain.
+7. Set `PUBLIC_APP_URL`, `NPU_TEAM_SUBMISSION_EMAIL`, and `NOTIFICATION_FROM_EMAIL` in `wrangler.jsonc` for the deployed environment.
+8. Deploy: `bun run deploy`
 
 For production env vars, run `wrangler secret put MY_VAR` for each secret listed in `.env.example`. Public (non-secret) vars go in `wrangler.jsonc` under `vars`.
 
 KV, D1, R2, and Durable Object bindings are configured in `wrangler.jsonc` — see https://developers.cloudflare.com/workers/wrangler/configuration/.
+
+The D1 workflow stores submitted reports, agenda items, review history, notification attempts, authorization records, revisions, and finalized print-route metadata. If the Email Sending binding is unavailable, submissions still save and the dashboard logs skipped notification attempts.
 
 
 
