@@ -222,7 +222,7 @@ export default function VotingReportForm() {
     }
 
     function afterPrint() {
-      document.title = "Planner's Voting Report";
+      document.title = "NPU Planner's Voting Report";
     }
 
     window.addEventListener("beforeprint", beforePrint);

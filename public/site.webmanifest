@@ -1,6 +1,6 @@
 {
-  "name": "DCP MarComm Intake",
-  "short_name": "DCP MarComm Intake",
+  "name": "NPU Planner's Voting Report",
+  "short_name": "NPU Voting Report",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,7 +20,7 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#000000",
-  "background_color": "#000000",
+  "theme_color": "#2563eb",
+  "background_color": "#f8fafc",
   "display": "standalone"
 }

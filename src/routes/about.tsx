@@ -12,7 +12,7 @@ function About() {
           About
         </p>
         <h1 className="m-0 text-3xl font-extrabold tracking-tight text-slate-950 sm:text-4xl">
-          Planner&apos;s Voting Report
+          NPU Planner&apos;s Voting Report
         </h1>
         <p className="mb-0 mt-4 leading-7">
           This TanStack Start app replaces the legacy static voting form with a

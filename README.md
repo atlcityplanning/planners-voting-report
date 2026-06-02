@@ -1,4 +1,4 @@
-NPU Voting Form
+NPU Planner's Voting Report
 
 # Getting Started
 

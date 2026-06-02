@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
-export default function Header() {
+export default function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/90 backdrop-blur print:hidden">
       <nav className="mx-auto flex min-h-16 w-[min(1180px,calc(100%-2rem))] flex-col items-start gap-3 py-4 sm:flex-row sm:items-center sm:gap-6 sm:py-0">

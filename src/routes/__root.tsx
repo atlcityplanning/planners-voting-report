@@ -1,8 +1,8 @@
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
-import Footer from "@/components/footer";
-import Header from "@/components/header";
+import SiteFooter from "@/components/site-footer";
+import SiteHeader from "@/components/site-header";
 
 import appCss from "@/styles.css?url";
 
@@ -17,7 +17,7 @@ export const Route = createRootRoute({
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "Planner's Voting Report",
+        title: "NPU Planner's Voting Report",
       },
       {
         name: "description",
@@ -25,6 +25,10 @@ export const Route = createRootRoute({
       },
     ],
     links: [
+      {
+        rel: "manifest",
+        href: "/site.webmanifest",
+      },
       {
         rel: "stylesheet",
         href: appCss,
@@ -41,9 +45,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="min-h-screen overflow-x-hidden bg-slate-50 font-sans text-slate-950 antialiased [overflow-wrap:anywhere] selection:bg-blue-100 selection:text-blue-950">
-        <Header />
+        <SiteHeader />
         {children}
-        <Footer />
+        <SiteFooter />
         <TanStackDevtools
           config={{
             position: "bottom-right",
