@@ -284,7 +284,10 @@ async function ensureSchema(db: D1Database) {
     return;
   }
 
-  await db.exec(SCHEMA_SQL);
+  for (const statement of SCHEMA_SQL.split(";").map((sql) => sql.trim()).filter(Boolean)) {
+    await db.prepare(statement).run();
+  }
+
   await db
     .prepare(
       `INSERT OR IGNORE INTO contact_directory_versions
