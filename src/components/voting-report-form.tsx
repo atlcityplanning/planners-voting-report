@@ -545,6 +545,12 @@ export default function VotingReportForm() {
           npu: report.npu,
         },
       });
+
+      if (import.meta.env.DEV) {
+        recipients.chairEmail = "drejohnson212@gmail.com";
+        recipients.plannerEmail = "dejohnson@atlantaga.gov";
+      }
+
       setSubmissionRecipients(recipients);
       window.requestAnimationFrame(() => submissionDialogRef.current?.showModal());
     } catch (error) {
@@ -649,7 +655,7 @@ export default function VotingReportForm() {
           <label className="grid gap-1">
             <span className={labelClass}>NPU Chair Email</span>
             <input
-              className={screenFieldClass}
+              className={cn(screenFieldClass, !import.meta.env.DEV && "read-only:opacity-60 read-only:cursor-not-allowed")}
               value={submissionRecipients.chairEmail}
               onChange={(event) =>
                 setSubmissionRecipients((currentRecipients) => ({
@@ -657,20 +663,12 @@ export default function VotingReportForm() {
                   chairEmail: event.target.value,
                 }))
               }
+              readOnly={!import.meta.env.DEV}
               type="email"
               required
             />
           </label>
-          <label className="grid gap-1">
-            <span className={labelClass}>NPU Team Email</span>
-            <input
-              className={cn(screenFieldClass, "read-only:opacity-60 read-only:cursor-not-allowed")}
-              value={submissionRecipients.npuTeamEmail}
-              readOnly
-              type="email"
-              required
-            />
-          </label>
+
           <label className="grid gap-1">
             <span className={labelClass}>Planner CC</span>
             <input
