@@ -52,7 +52,7 @@ export function VotingReportSubmissionEmail({ report, dashboardUrl }: Submission
                 NPU {report.report.npu} Voting Report Submitted
               </Heading>
               <Text className="mb-0 text-base leading-7 text-slate-600">
-                A voting report has been submitted for centralized review and authorization.
+                A voting report has been submitted for centralized review.
               </Text>
             </Section>
 

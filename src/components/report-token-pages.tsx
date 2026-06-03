@@ -1,11 +1,8 @@
-import { CheckCircle2, RotateCcw, ShieldCheck } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
 
 import type { StoredVotingReport } from "@/lib/votingReportWorkflow";
 import {
-  approveReportForChair,
-  authorizeReport,
   getReportForToken,
   requestReportChanges,
 } from "@/server/reportActions";
@@ -20,8 +17,6 @@ const fieldClass =
   "min-h-11 w-full rounded-xl border border-input bg-card px-3 py-2 text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/15";
 const buttonClass =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-muted hover:text-primary focus:outline-none focus:ring-4 focus:ring-primary/15";
-const primaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/15 transition-colors hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20";
 
 function ReportTokenSummary({ report }: { report: StoredVotingReport }) {
   return (
@@ -67,28 +62,20 @@ export function ReviewTokenPage({ token }: TokenPageProps) {
     void loadReport();
   }, [token]);
 
-  async function runReviewAction(action: "approve" | "changes") {
+  async function requestChanges() {
     if (!report) {
       return;
     }
 
-    const nextReport =
-      action === "approve"
-        ? await approveReportForChair({
-            data: {
-              reportId: report.id,
-              comments,
-            },
-          })
-        : await requestReportChanges({
-            data: {
-              reportId: report.id,
-              comments,
-            },
-          });
+    const nextReport = await requestReportChanges({
+      data: {
+        reportId: report.id,
+        comments,
+      },
+    });
 
     setReport(nextReport);
-    setMessage(action === "approve" ? "Approved for chair authorization." : "Changes requested.");
+    setMessage("Changes requested.");
   }
 
   if (isLoading) {
@@ -129,126 +116,11 @@ export function ReviewTokenPage({ token }: TokenPageProps) {
           </p>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" className={buttonClass} onClick={() => void runReviewAction("changes")}>
+          <button type="button" className={buttonClass} onClick={() => void requestChanges()}>
             <RotateCcw aria-hidden="true" size={18} />
             Request Changes
           </button>
-          <button type="button" className={primaryButtonClass} onClick={() => void runReviewAction("approve")}>
-            <CheckCircle2 aria-hidden="true" size={18} />
-            Approve For Chair
-          </button>
         </div>
-      </section>
-    </main>
-  );
-}
-
-export function AuthorizationTokenPage({ token }: TokenPageProps) {
-  const [report, setReport] = useState<StoredVotingReport | null>(null);
-  const [signerName, setSignerName] = useState("");
-  const [signerEmail, setSignerEmail] = useState("");
-  const [acceptedStatement, setAcceptedStatement] = useState(false);
-  const [message, setMessage] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadReport() {
-      setIsLoading(true);
-      setReport(await getReportForToken({ data: { token } }));
-      setIsLoading(false);
-    }
-
-    void loadReport();
-  }, [token]);
-
-  async function handleAuthorize(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!acceptedStatement) {
-      setMessage("Please confirm authorization before submitting.");
-      return;
-    }
-
-    const nextReport = await authorizeReport({
-      data: {
-        token,
-        signerName,
-        signerEmail,
-        acceptedStatement: true,
-      },
-    });
-    setReport(nextReport);
-    setMessage("Chair authorization recorded.");
-  }
-
-  if (isLoading) {
-    return (
-      <main className="mx-auto w-[min(900px,calc(100%-2rem))] py-8">
-        <section className={panelClass}>Loading authorization link...</section>
-      </main>
-    );
-  }
-
-  if (!report) {
-    return (
-      <main className="mx-auto w-[min(900px,calc(100%-2rem))] py-8">
-        <section className={panelClass}>Authorization link is invalid or expired.</section>
-      </main>
-    );
-  }
-
-  return (
-    <main className="mx-auto grid w-[min(900px,calc(100%-2rem))] gap-4 py-8">
-      <ReportTokenSummary report={report} />
-      <section className={panelClass}>
-        <h2 className="m-0 mb-4 text-lg font-extrabold text-foreground">Chair Authorization</h2>
-        <form className="grid gap-4" onSubmit={handleAuthorize}>
-          <label className="grid gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Signer Name
-            </span>
-            <input
-              className={fieldClass}
-              value={signerName}
-              onChange={(event) => setSignerName(event.target.value)}
-              type="text"
-              required
-            />
-          </label>
-          <label className="grid gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
-              Signer Email
-            </span>
-            <input
-              className={fieldClass}
-              value={signerEmail}
-              onChange={(event) => setSignerEmail(event.target.value)}
-              type="email"
-              required
-            />
-          </label>
-          <label className="grid grid-cols-[auto_1fr] gap-3 rounded-xl bg-muted p-3">
-            <input
-              className="mt-1 size-4"
-              checked={acceptedStatement}
-              onChange={(event) => setAcceptedStatement(event.target.checked)}
-              type="checkbox"
-              required
-            />
-            <span className="text-sm leading-6">
-              I confirm this report is authorized for finalization. This records an audit-backed
-              authorization timestamp.
-            </span>
-          </label>
-          {message ? (
-            <p className="rounded-xl bg-muted px-3 py-2 text-sm font-semibold text-muted-foreground">
-              {message}
-            </p>
-          ) : null}
-          <button type="submit" className={primaryButtonClass}>
-            <ShieldCheck aria-hidden="true" size={18} />
-            Authorize Report
-          </button>
-        </form>
       </section>
     </main>
   );

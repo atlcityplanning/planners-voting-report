@@ -2,14 +2,15 @@ import { NPU_CONTACT_SOURCE } from "@/lib/npuContactDirectory";
 import { INITIAL_REPORT_STATE } from "@/lib/votingReport";
 import type { AgendaItem, ReportFormState } from "@/lib/votingReport";
 import type {
-  AuthorizationRecord,
   FinalizedPdfMetadata,
+  ReportSignature,
+  ReportSignatureRole,
   NotificationAttempt,
   ReportStatus,
   StoredVotingReport,
   WorkflowEvent,
 } from "@/lib/votingReportWorkflow";
-import { normalizeReportFormState } from "@/lib/votingReportWorkflow";
+import { createReportId, normalizeReportFormState } from "@/lib/votingReportWorkflow";
 import { getAppEnv } from "@/server/platform";
 
 const SCHEMA_SQL = `
@@ -90,14 +91,15 @@ CREATE TABLE IF NOT EXISTS review_tokens (
   FOREIGN KEY (report_id) REFERENCES voting_reports(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS authorization_records (
+CREATE TABLE IF NOT EXISTS report_signatures (
   id TEXT PRIMARY KEY,
   report_id TEXT NOT NULL,
+  signer_role TEXT NOT NULL,
   signer_name TEXT NOT NULL,
-  signer_email TEXT NOT NULL,
-  accepted_statement INTEGER NOT NULL,
-  signed_at TEXT NOT NULL,
-  token TEXT NOT NULL,
+  signed_date TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(report_id, signer_role),
   FOREIGN KEY (report_id) REFERENCES voting_reports(id) ON DELETE CASCADE
 );
 
@@ -136,7 +138,7 @@ CREATE TABLE IF NOT EXISTS monday_provisioning_keys (
 
 type ReportRow = {
   id: string;
-  status: ReportStatus;
+  status: string;
   npu: string;
   chair: string;
   location: string;
@@ -182,12 +184,13 @@ type EventRow = {
   created_at: string;
 };
 
-type AuthorizationRow = {
+type SignatureRow = {
   id: string;
+  signer_role: ReportSignatureRole;
   signer_name: string;
-  signer_email: string;
-  accepted_statement: number;
-  signed_at: string;
+  signed_date: string;
+  created_at: string;
+  updated_at: string;
 };
 
 type FinalizedPdfRow = {
@@ -235,7 +238,7 @@ const memoryTokens = new Map<
   {
     token: string;
     reportId: string;
-    purpose: "review" | "authorize";
+    purpose: "review";
     recipientEmail: string;
     expiresAt: string;
     createdAt: string;
@@ -243,12 +246,48 @@ const memoryTokens = new Map<
 >();
 const ensuredDbs = new WeakSet<D1Database>();
 
+function createEmptySignatures(): Record<ReportSignatureRole, ReportSignature | null> {
+  return {
+    chair: null,
+    planner: null,
+  };
+}
+
 function createId() {
   return crypto.randomUUID();
 }
 
+async function createUniqueReportId() {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const reportId = createReportId();
+    const existingReport = await getReport(reportId);
+    if (!existingReport) {
+      return reportId;
+    }
+  }
+
+  throw new Error("Unable to create unique report ID.");
+}
+
 function nowIso() {
   return new Date().toISOString();
+}
+
+function normalizeStoredStatus(status: string): ReportStatus {
+  if (status === "approved_for_chair" || status === "chair_authorized") {
+    return "submitted_for_review";
+  }
+
+  if (
+    status === "draft" ||
+    status === "submitted_for_review" ||
+    status === "changes_requested" ||
+    status === "finalized"
+  ) {
+    return status;
+  }
+
+  return "submitted_for_review";
 }
 
 function createBlankStoredReport(
@@ -257,7 +296,7 @@ function createBlankStoredReport(
 ): StoredVotingReport {
   const timestamp = nowIso();
   const report = normalizeReportFormState(input.report);
-  const id = input.reportId || existing?.id || createId();
+  const id = input.reportId || existing?.id || createReportId();
 
   return {
     id,
@@ -274,7 +313,7 @@ function createBlankStoredReport(
     finalizedAt: existing?.finalizedAt ?? "",
     notificationAttempts: existing?.notificationAttempts ?? [],
     workflowEvents: existing?.workflowEvents ?? [],
-    authorization: existing?.authorization ?? null,
+    signatures: existing?.signatures ?? createEmptySignatures(),
     finalizedPdf: existing?.finalizedPdf ?? null,
   };
 }
@@ -323,7 +362,13 @@ function rowToReport(row: ReportRow, items: Array<AgendaItem>): ReportFormState 
 }
 
 async function hydrateD1Report(db: D1Database, row: ReportRow): Promise<StoredVotingReport> {
-  const [itemResult, notificationResult, eventResult, authorizationRow, finalizedPdfRow] =
+  const [
+    itemResult,
+    notificationResult,
+    eventResult,
+    signatureResult,
+    finalizedPdfRow,
+  ] =
     await Promise.all([
       db
         .prepare(
@@ -354,14 +399,12 @@ async function hydrateD1Report(db: D1Database, row: ReportRow): Promise<StoredVo
         .all<EventRow>(),
       db
         .prepare(
-          `SELECT id, signer_name, signer_email, accepted_statement, signed_at
-          FROM authorization_records
-          WHERE report_id = ?
-          ORDER BY signed_at DESC
-          LIMIT 1`,
+          `SELECT id, signer_role, signer_name, signed_date, created_at, updated_at
+          FROM report_signatures
+          WHERE report_id = ?`,
         )
         .bind(row.id)
-        .first<AuthorizationRow>(),
+        .all<SignatureRow>(),
       db
         .prepare(
           `SELECT id, revision, pdf_url, storage_key, created_at
@@ -381,10 +424,21 @@ async function hydrateD1Report(db: D1Database, row: ReportRow): Promise<StoredVo
     recommendation: item.recommendation as AgendaItem["recommendation"],
     comments: item.comments,
   }));
+  const signatures = createEmptySignatures();
+  for (const signature of signatureResult.results ?? []) {
+    signatures[signature.signer_role] = {
+      id: signature.id,
+      role: signature.signer_role,
+      signerName: signature.signer_name,
+      signedDate: signature.signed_date,
+      createdAt: signature.created_at,
+      updatedAt: signature.updated_at,
+    };
+  }
 
   return {
     id: row.id,
-    status: row.status,
+    status: normalizeStoredStatus(row.status),
     report: rowToReport(row, items),
     chairEmail: row.chair_email,
     plannerEmail: row.planner_email,
@@ -412,15 +466,7 @@ async function hydrateD1Report(db: D1Database, row: ReportRow): Promise<StoredVo
       comments: event.comments,
       createdAt: event.created_at,
     })),
-    authorization: authorizationRow
-      ? {
-          id: authorizationRow.id,
-          signerName: authorizationRow.signer_name,
-          signerEmail: authorizationRow.signer_email,
-          acceptedStatement: authorizationRow.accepted_statement === 1,
-          signedAt: authorizationRow.signed_at,
-        }
-      : null,
+    signatures,
     finalizedPdf: finalizedPdfRow
       ? {
           id: finalizedPdfRow.id,
@@ -456,8 +502,9 @@ async function getD1Report(db: D1Database, reportId: string) {
 
 export async function upsertReport(input: ReportUpsertInput) {
   const db = getD1();
-  const existing = input.reportId ? await getReport(input.reportId) : null;
-  const storedReport = createBlankStoredReport(input, existing ?? undefined);
+  const reportId = input.reportId ?? (await createUniqueReportId());
+  const existing = await getReport(reportId);
+  const storedReport = createBlankStoredReport({ ...input, reportId }, existing ?? undefined);
 
   if (!db) {
     memoryReports.set(storedReport.id, storedReport);
@@ -791,51 +838,79 @@ export async function updateReportStatus(
   return getD1Report(db, reportId);
 }
 
-export async function addAuthorizationRecord(
+export async function saveReportSignature(
   reportId: string,
-  input: Omit<AuthorizationRecord, "id" | "signedAt"> & { token: string },
+  input: Pick<ReportSignature, "role" | "signerName" | "signedDate">,
 ) {
-  const signedAt = nowIso();
-  const authorization: AuthorizationRecord = {
-    id: createId(),
-    signerName: input.signerName,
-    signerEmail: input.signerEmail,
-    acceptedStatement: input.acceptedStatement,
-    signedAt,
-  };
-
+  const timestamp = nowIso();
   const db = getD1();
+
   if (!db) {
     const report = memoryReports.get(reportId);
-    if (report) {
-      report.authorization = authorization;
-      report.status = "chair_authorized";
-      report.updatedAt = signedAt;
-      memoryReports.set(reportId, report);
+    if (!report) {
+      return null;
     }
-    return authorization;
+
+    const existing = report.signatures[input.role];
+    const signature: ReportSignature = {
+      id: existing?.id ?? createId(),
+      role: input.role,
+      signerName: input.signerName,
+      signedDate: input.signedDate,
+      createdAt: existing?.createdAt ?? timestamp,
+      updatedAt: timestamp,
+    };
+    const nextReport = {
+      ...report,
+      updatedAt: timestamp,
+      signatures: {
+        ...report.signatures,
+        [input.role]: signature,
+      },
+    };
+    memoryReports.set(reportId, nextReport);
+    return nextReport;
   }
 
   await ensureSchema(db);
+  const existing = await db
+    .prepare(
+      `SELECT id, created_at
+      FROM report_signatures
+      WHERE report_id = ? AND signer_role = ?`,
+    )
+    .bind(reportId, input.role)
+    .first<{ id: string; created_at: string }>();
+
+  const signatureId = existing?.id ?? createId();
+  const createdAt = existing?.created_at ?? timestamp;
   await db
     .prepare(
-      `INSERT INTO authorization_records
-        (id, report_id, signer_name, signer_email, accepted_statement, signed_at, token)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO report_signatures
+        (id, report_id, signer_role, signer_name, signed_date, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(report_id, signer_role) DO UPDATE SET
+        signer_name = excluded.signer_name,
+        signed_date = excluded.signed_date,
+        updated_at = excluded.updated_at`,
     )
     .bind(
-      authorization.id,
+      signatureId,
       reportId,
-      authorization.signerName,
-      authorization.signerEmail,
-      authorization.acceptedStatement ? 1 : 0,
-      authorization.signedAt,
-      input.token,
+      input.role,
+      input.signerName,
+      input.signedDate,
+      createdAt,
+      timestamp,
     )
     .run();
-  await updateReportStatus(reportId, "chair_authorized");
 
-  return authorization;
+  await db
+    .prepare("UPDATE voting_reports SET updated_at = ? WHERE id = ?")
+    .bind(timestamp, reportId)
+    .run();
+
+  return getD1Report(db, reportId);
 }
 
 export async function createReportRevision(reportId: string, reason: string) {
@@ -878,7 +953,7 @@ export async function createReportRevision(reportId: string, reason: string) {
 
 export async function createReviewToken(
   reportId: string,
-  purpose: "review" | "authorize",
+  purpose: "review",
   recipientEmail: string,
 ) {
   const token = createId();

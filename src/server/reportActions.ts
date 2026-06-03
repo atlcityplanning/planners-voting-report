@@ -8,7 +8,6 @@ import {
 import { getAppEnv, getNpuTeamSubmissionEmail } from "@/server/platform";
 import { sendSubmissionNotifications } from "@/server/reportEmail";
 import {
-  addAuthorizationRecord,
   addWorkflowEvent,
   attachFinalizedPdfMetadata,
   completeMondayProvisioningKey,
@@ -19,14 +18,15 @@ import {
   getReport,
   getReportByToken,
   listReports,
+  saveReportSignature,
   updateReportStatus,
   upsertReport,
 } from "@/server/reportStorage";
 import {
-  authorizationInputSchema,
   createRevisionInputSchema,
   getSubmissionRecipientsInputSchema,
   reportIdInputSchema,
+  reportSignatureInputSchema,
   reviewInputSchema,
   submitForReviewInputSchema,
   tokenInputSchema,
@@ -105,7 +105,6 @@ export const submitForReview = createServerFn({ method: "POST" })
       comments: "Report submitted for centralized review.",
     });
     await createReviewToken(report.id, "review", report.npuTeamEmail);
-    await createReviewToken(report.id, "authorize", report.chairEmail);
     await sendSubmissionNotifications(report);
 
     return (await getReport(report.id)) ?? report;
@@ -133,24 +132,6 @@ export const resendSubmissionNotification = createServerFn({ method: "POST" })
     return getReport(data.reportId);
   });
 
-export const approveReportForChair = createServerFn({ method: "POST" })
-  .inputValidator(reviewInputSchema)
-  .handler(async ({ data }) => {
-    const report = await updateReportStatus(data.reportId, "approved_for_chair");
-    if (!report) {
-      throw new Error("Report not found.");
-    }
-
-    await addWorkflowEvent(data.reportId, {
-      eventType: "approved_for_chair",
-      actorName: data.actorName,
-      actorEmail: data.actorEmail,
-      comments: data.comments || "Report approved for chair authorization.",
-    });
-
-    return getReport(data.reportId);
-  });
-
 export const requestReportChanges = createServerFn({ method: "POST" })
   .inputValidator(reviewInputSchema)
   .handler(async ({ data }) => {
@@ -169,28 +150,27 @@ export const requestReportChanges = createServerFn({ method: "POST" })
     return getReport(data.reportId);
   });
 
-export const authorizeReport = createServerFn({ method: "POST" })
-  .inputValidator(authorizationInputSchema)
+export const signReport = createServerFn({ method: "POST" })
+  .inputValidator(reportSignatureInputSchema)
   .handler(async ({ data }) => {
-    const report = await getReportByToken(data.token);
+    const report = await saveReportSignature(data.reportId, {
+      role: data.role,
+      signerName: data.signerName,
+      signedDate: data.signedDate,
+    });
     if (!report) {
-      throw new Error("Authorization link is invalid or expired.");
+      throw new Error("Report not found.");
     }
 
-    await addAuthorizationRecord(report.id, {
-      signerName: data.signerName,
-      signerEmail: data.signerEmail,
-      acceptedStatement: data.acceptedStatement,
-      token: data.token,
-    });
-    await addWorkflowEvent(report.id, {
-      eventType: "chair_authorized",
+    const roleLabel = data.role === "chair" ? "Chair" : "Planner";
+    await addWorkflowEvent(data.reportId, {
+      eventType: `${data.role}_signed`,
       actorName: data.signerName,
-      actorEmail: data.signerEmail,
-      comments: "Chair authorization recorded.",
+      actorEmail: data.role === "chair" ? report.chairEmail : report.plannerEmail,
+      comments: `${roleLabel} signature recorded for ${data.signedDate}.`,
     });
 
-    return getReport(report.id);
+    return getReport(data.reportId);
   });
 
 export const finalizeReport = createServerFn({ method: "POST" })

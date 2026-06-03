@@ -25,6 +25,19 @@ function formatDateTime(value: string) {
   return date.toLocaleString();
 }
 
+function formatSignedDate(value: string) {
+  if (!value) {
+    return "Not recorded";
+  }
+
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnlyMatch) {
+    return `${dateOnlyMatch[2]}/${dateOnlyMatch[3]}/${dateOnlyMatch[1]}`;
+  }
+
+  return formatDateTime(value);
+}
+
 export default function FinalReport({ reportId }: FinalReportProps) {
   const [report, setReport] = useState<StoredVotingReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,6 +84,9 @@ export default function FinalReport({ reportId }: FinalReportProps) {
       </main>
     );
   }
+
+  const chairSignature = report.signatures.chair;
+  const plannerSignature = report.signatures.planner;
 
   return (
     <main className="mx-auto w-[min(960px,calc(100%-2rem))] py-8 print:w-full print:py-0">
@@ -176,22 +192,31 @@ export default function FinalReport({ reportId }: FinalReportProps) {
       <section className="mt-6 grid gap-4 sm:grid-cols-2 print:grid-cols-2">
         <div className="rounded-lg border border-border p-4 print:border-neutral-600">
           <p className="m-0 text-sm font-bold text-foreground print:text-black">
-            Chair Authorization
+            Chair Signature
           </p>
           <p className="m-0 mt-2 text-sm text-muted-foreground print:text-black">
-            {report.authorization
-              ? `${report.authorization.signerName} | ${formatDateTime(
-                  report.authorization.signedAt,
-                )}`
-              : "Not authorized"}
+            {chairSignature
+              ? `${chairSignature.signerName} | ${formatSignedDate(chairSignature.signedDate)}`
+              : "Not signed"}
           </p>
         </div>
         <div className="rounded-lg border border-border p-4 print:border-neutral-600">
-          <p className="m-0 text-sm font-bold text-foreground print:text-black">Finalization</p>
+          <p className="m-0 text-sm font-bold text-foreground print:text-black">
+            Planner Signature
+          </p>
           <p className="m-0 mt-2 text-sm text-muted-foreground print:text-black">
-            {report.finalizedAt ? formatDateTime(report.finalizedAt) : "Not finalized"}
+            {plannerSignature
+              ? `${plannerSignature.signerName} | ${formatSignedDate(plannerSignature.signedDate)}`
+              : "Not signed"}
           </p>
         </div>
+      </section>
+
+      <section className="mt-4 rounded-lg border border-border p-4 print:border-neutral-600">
+        <p className="m-0 text-sm font-bold text-foreground print:text-black">Finalization</p>
+        <p className="m-0 mt-2 text-sm text-muted-foreground print:text-black">
+          {report.finalizedAt ? formatDateTime(report.finalizedAt) : "Not finalized"}
+        </p>
       </section>
     </main>
   );

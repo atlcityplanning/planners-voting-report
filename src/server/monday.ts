@@ -8,8 +8,6 @@ const DEFAULT_MONDAY_API_VERSION = "2025-10";
 const MONDAY_BOARD_GROUPS = [
   { key: "submittedForReview", title: "Submitted for Review", color: "#579bfc" },
   { key: "changesRequested", title: "Changes Requested", color: "#fdab3d" },
-  { key: "approvedForChair", title: "Approved for Chair", color: "#784bd1" },
-  { key: "chairAuthorized", title: "Chair Authorized", color: "#00c875" },
   { key: "finalized", title: "Finalized", color: "#037f4c" },
 ] as const;
 
@@ -33,9 +31,7 @@ const MONDAY_BOARD_COLUMNS = [
 const MONDAY_STATUS_LABELS = [
   { label: "Submitted for Review", color: "working_orange", index: 0 },
   { label: "Changes Requested", color: "stuck_red", index: 1 },
-  { label: "Approved for Chair", color: "sky", index: 2 },
-  { label: "Chair Authorized", color: "working_orange", index: 3 },
-  { label: "Finalized", color: "done_green", index: 4, is_done: true },
+  { label: "Finalized", color: "done_green", index: 2, is_done: true },
 ] as const;
 
 const boardKindSchema = z.enum(["public", "private", "share"]);

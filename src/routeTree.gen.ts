@@ -13,7 +13,6 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReviewTokenRouteImport } from './routes/review.$token'
 import { Route as DashboardReportIdRouteImport } from './routes/dashboard.$reportId'
-import { Route as AuthorizeTokenRouteImport } from './routes/authorize.$token'
 import { Route as AdminMondayProvisionRouteImport } from './routes/admin.monday-provision'
 import { Route as ReportsReportIdPrintRouteImport } from './routes/reports.$reportId.print'
 
@@ -37,11 +36,6 @@ const DashboardReportIdRoute = DashboardReportIdRouteImport.update({
   path: '/dashboard/$reportId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthorizeTokenRoute = AuthorizeTokenRouteImport.update({
-  id: '/authorize/$token',
-  path: '/authorize/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AdminMondayProvisionRoute = AdminMondayProvisionRouteImport.update({
   id: '/admin/monday-provision',
   path: '/admin/monday-provision',
@@ -57,7 +51,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin/monday-provision': typeof AdminMondayProvisionRoute
-  '/authorize/$token': typeof AuthorizeTokenRoute
   '/dashboard/$reportId': typeof DashboardReportIdRoute
   '/review/$token': typeof ReviewTokenRoute
   '/reports/$reportId/print': typeof ReportsReportIdPrintRoute
@@ -66,7 +59,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin/monday-provision': typeof AdminMondayProvisionRoute
-  '/authorize/$token': typeof AuthorizeTokenRoute
   '/dashboard/$reportId': typeof DashboardReportIdRoute
   '/review/$token': typeof ReviewTokenRoute
   '/reports/$reportId/print': typeof ReportsReportIdPrintRoute
@@ -76,7 +68,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/admin/monday-provision': typeof AdminMondayProvisionRoute
-  '/authorize/$token': typeof AuthorizeTokenRoute
   '/dashboard/$reportId': typeof DashboardReportIdRoute
   '/review/$token': typeof ReviewTokenRoute
   '/reports/$reportId/print': typeof ReportsReportIdPrintRoute
@@ -87,7 +78,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin/monday-provision'
-    | '/authorize/$token'
     | '/dashboard/$reportId'
     | '/review/$token'
     | '/reports/$reportId/print'
@@ -96,7 +86,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin/monday-provision'
-    | '/authorize/$token'
     | '/dashboard/$reportId'
     | '/review/$token'
     | '/reports/$reportId/print'
@@ -105,7 +94,6 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/admin/monday-provision'
-    | '/authorize/$token'
     | '/dashboard/$reportId'
     | '/review/$token'
     | '/reports/$reportId/print'
@@ -115,7 +103,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AdminMondayProvisionRoute: typeof AdminMondayProvisionRoute
-  AuthorizeTokenRoute: typeof AuthorizeTokenRoute
   DashboardReportIdRoute: typeof DashboardReportIdRoute
   ReviewTokenRoute: typeof ReviewTokenRoute
   ReportsReportIdPrintRoute: typeof ReportsReportIdPrintRoute
@@ -151,13 +138,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardReportIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/authorize/$token': {
-      id: '/authorize/$token'
-      path: '/authorize/$token'
-      fullPath: '/authorize/$token'
-      preLoaderRoute: typeof AuthorizeTokenRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/admin/monday-provision': {
       id: '/admin/monday-provision'
       path: '/admin/monday-provision'
@@ -179,7 +159,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AdminMondayProvisionRoute: AdminMondayProvisionRoute,
-  AuthorizeTokenRoute: AuthorizeTokenRoute,
   DashboardReportIdRoute: DashboardReportIdRoute,
   ReviewTokenRoute: ReviewTokenRoute,
   ReportsReportIdPrintRoute: ReportsReportIdPrintRoute,

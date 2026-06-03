@@ -33,9 +33,15 @@ import { useAppForm } from "@/hooks/form";
 import { NPU_CONTACT_SOURCE, getNpuContactDefault } from "@/lib/npuContactDirectory";
 import type { SubmissionRecipients } from "@/lib/votingReportWorkflow";
 import { getSubmissionRecipients, submitForReview } from "@/server/reportActions";
+import {
+  type VotingReportDraft,
+  VOTING_REPORT_DRAFT_ID,
+  votingReportDraftCollection,
+} from "@/stores/voting-report-draft-db";
 import { cn } from "@/utils/cn";
 
-const STORAGE_KEY = "npu-voting-report:v1";
+const LEGACY_STORAGE_KEY = "npu-voting-report:v1";
+const INITIAL_REPORT_JSON = JSON.stringify(INITIAL_REPORT_STATE);
 const UPDATES_URL =
   "https://www.atlantaga.gov/government/departments/city-planning/neighborhood-planning-units/updates";
 
@@ -175,12 +181,12 @@ function loadStoredReport(): ReportFormState {
     return INITIAL_REPORT_STATE;
   }
 
-  const storedReport = window.localStorage.getItem(STORAGE_KEY);
+  const storedReport = window.localStorage.getItem(LEGACY_STORAGE_KEY);
   if (storedReport) {
     try {
       return sanitizeReport(JSON.parse(storedReport) as Partial<ReportFormState>);
     } catch {
-      window.localStorage.removeItem(STORAGE_KEY);
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
     }
   }
 
@@ -225,7 +231,10 @@ export default function VotingReportForm() {
     defaultValues: INITIAL_REPORT_STATE,
   });
   const report = useStore(form.store, (state: any) => state.values as ReportFormState);
+  const serializedReport = useStore(form.store, (state: any) => JSON.stringify(state.values));
   const [newItem, setNewItem] = useState<NewItemForm>(EMPTY_NEW_ITEM);
+  const [savedDrafts, setSavedDrafts] = useState<Array<VotingReportDraft>>([]);
+  const [isDraftStoreReady, setIsDraftStoreReady] = useState(false);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dialogMessage, setDialogMessage] = useState("");
@@ -241,6 +250,8 @@ export default function VotingReportForm() {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const submissionDialogRef = useRef<HTMLDialogElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const pendingHydrationJsonRef = useRef("");
+  const lastPersistedReportJsonRef = useRef("");
 
   const printLabels = useMemo(
     () => getReportPrintLabels(report.npu, report.meetingDate),
@@ -251,23 +262,105 @@ export default function VotingReportForm() {
     () => report.items.filter((item) => item.recommendation === "PENDING").length,
     [report.items],
   );
+  const activeDraft = useMemo(
+    () => savedDrafts.find((draft) => draft.id === VOTING_REPORT_DRAFT_ID),
+    [savedDrafts],
+  );
   const reportTitle = report.meetingDate ? printLabels.headerTitle : "VOTING REPORT";
 
   useEffect(() => {
-    const loaded = applyContactDefaults(loadStoredReport(), "fill-empty");
-    (Object.keys(loaded) as Array<keyof ReportFormState>).forEach(key => {
+    let isMounted = true;
+
+    function syncSavedDrafts() {
+      if (!isMounted) {
+        return;
+      }
+
+      setSavedDrafts(votingReportDraftCollection.toArray as Array<VotingReportDraft>);
+    }
+
+    const subscription = votingReportDraftCollection.subscribeChanges(syncSavedDrafts);
+    votingReportDraftCollection.startSyncImmediate();
+    syncSavedDrafts();
+
+    if (votingReportDraftCollection.isReady()) {
+      setIsDraftStoreReady(true);
+    } else {
+      votingReportDraftCollection.onFirstReady(() => {
+        syncSavedDrafts();
+        if (isMounted) {
+          setIsDraftStoreReady(true);
+        }
+      });
+    }
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isDraftStoreReady || hasLoadedStorage) {
+      return;
+    }
+
+    const loaded = applyContactDefaults(
+      activeDraft?.report ? sanitizeReport(activeDraft.report) : loadStoredReport(),
+      "fill-empty",
+    );
+    const serializedLoaded = JSON.stringify(loaded);
+
+    pendingHydrationJsonRef.current = serializedLoaded;
+    lastPersistedReportJsonRef.current = serializedLoaded;
+    (Object.keys(loaded) as Array<keyof ReportFormState>).forEach((key) => {
       form.setFieldValue(key, loaded[key]);
     });
+
+    if (!votingReportDraftCollection.has(VOTING_REPORT_DRAFT_ID)) {
+      votingReportDraftCollection.insert({
+        id: VOTING_REPORT_DRAFT_ID,
+        report: loaded,
+      });
+    }
+
     setHasLoadedStorage(true);
-  }, [form]);
+  }, [activeDraft, form, hasLoadedStorage, isDraftStoreReady]);
 
   useEffect(() => {
     if (!hasLoadedStorage) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(report));
-  }, [hasLoadedStorage, report]);
+    if (pendingHydrationJsonRef.current) {
+      if (serializedReport === pendingHydrationJsonRef.current) {
+        pendingHydrationJsonRef.current = "";
+      } else if (serializedReport === INITIAL_REPORT_JSON) {
+        return;
+      } else {
+        pendingHydrationJsonRef.current = "";
+      }
+    }
+
+    if (serializedReport === lastPersistedReportJsonRef.current) {
+      return;
+    }
+
+    const reportToPersist = JSON.parse(serializedReport) as ReportFormState;
+
+    if (votingReportDraftCollection.has(VOTING_REPORT_DRAFT_ID)) {
+      votingReportDraftCollection.update(VOTING_REPORT_DRAFT_ID, (draft) => {
+        draft.report = reportToPersist;
+      });
+    } else {
+      votingReportDraftCollection.insert({
+        id: VOTING_REPORT_DRAFT_ID,
+        report: reportToPersist,
+      });
+    }
+
+    lastPersistedReportJsonRef.current = serializedReport;
+  }, [hasLoadedStorage, serializedReport]);
 
   useEffect(() => {
     if (!copiedUpdatesLink) {

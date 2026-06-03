@@ -11,8 +11,6 @@ export const REPORT_STATUSES = [
   "draft",
   "submitted_for_review",
   "changes_requested",
-  "approved_for_chair",
-  "chair_authorized",
   "finalized",
 ] as const;
 
@@ -37,12 +35,15 @@ export type WorkflowEvent = {
   createdAt: string;
 };
 
-export type AuthorizationRecord = {
+export type ReportSignatureRole = "chair" | "planner";
+
+export type ReportSignature = {
   id: string;
+  role: ReportSignatureRole;
   signerName: string;
-  signerEmail: string;
-  acceptedStatement: boolean;
-  signedAt: string;
+  signedDate: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type FinalizedPdfMetadata = {
@@ -68,7 +69,7 @@ export type StoredVotingReport = {
   finalizedAt: string;
   notificationAttempts: Array<NotificationAttempt>;
   workflowEvents: Array<WorkflowEvent>;
-  authorization: AuthorizationRecord | null;
+  signatures: Record<ReportSignatureRole, ReportSignature | null>;
   finalizedPdf: FinalizedPdfMetadata | null;
 };
 
@@ -78,8 +79,37 @@ export type SubmissionRecipients = {
   npuTeamEmail: string;
 };
 
+const CROCKFORD_BASE32_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const REPORT_ID_TIME_LENGTH = 10;
+const REPORT_ID_RANDOM_LENGTH = 6;
+
 function createSchemaId() {
   return crypto.randomUUID();
+}
+
+function encodeCrockfordBase32(value: number, length: number) {
+  let encoded = "";
+  let currentValue = value;
+
+  for (let index = 0; index < length; index += 1) {
+    encoded = CROCKFORD_BASE32_ALPHABET[currentValue % 32] + encoded;
+    currentValue = Math.floor(currentValue / 32);
+  }
+
+  return encoded;
+}
+
+function getRandomReportIdSuffix() {
+  const bytes = new Uint8Array(REPORT_ID_RANDOM_LENGTH);
+  crypto.getRandomValues(bytes);
+
+  return Array.from(bytes)
+    .map((byte) => CROCKFORD_BASE32_ALPHABET[byte % 32])
+    .join("");
+}
+
+export function createReportId() {
+  return `${encodeCrockfordBase32(Date.now(), REPORT_ID_TIME_LENGTH)}${getRandomReportIdSuffix()}`;
 }
 
 export const agendaItemSchema = z
@@ -141,11 +171,11 @@ export const reviewInputSchema = z.object({
   comments: z.string().trim().default(""),
 });
 
-export const authorizationInputSchema = z.object({
-  token: z.string().min(1),
-  signerName: z.string().trim().min(1, "Signer name is required."),
-  signerEmail: emailRecipientSchema,
-  acceptedStatement: z.literal(true),
+export const reportSignatureInputSchema = z.object({
+  reportId: z.string().min(1),
+  role: z.enum(["chair", "planner"]),
+  signerName: z.string().trim().min(1, "Signature name is required."),
+  signedDate: z.iso.date("Signature date is required."),
 });
 
 export const createRevisionInputSchema = z.object({

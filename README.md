@@ -56,7 +56,7 @@ For production env vars, run `wrangler secret put MY_VAR` for each secret listed
 
 KV, D1, R2, and Durable Object bindings are configured in `wrangler.jsonc` — see https://developers.cloudflare.com/workers/wrangler/configuration/.
 
-The D1 workflow stores submitted reports, agenda items, review history, notification attempts, authorization records, revisions, and finalized print-route metadata. If the Email Sending binding is unavailable, submissions still save and the dashboard logs skipped notification attempts.
+The D1 workflow stores submitted reports, agenda items, review history, notification attempts, signatures, revisions, and finalized print-route metadata. If the Email Sending binding is unavailable, submissions still save and the dashboard logs skipped notification attempts.
 
 ## monday.com Board Provisioning
 

@@ -6,23 +6,27 @@ import {
   Printer,
   RefreshCcw,
   RotateCcw,
-  ShieldCheck,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import type { StoredVotingReport } from "@/lib/votingReportWorkflow";
+import type { ReportSignatureRole, StoredVotingReport } from "@/lib/votingReportWorkflow";
 import {
-  approveReportForChair,
   createRevision,
   finalizeReport,
   getReportById,
   requestReportChanges,
   resendSubmissionNotification,
+  signReport,
 } from "@/server/reportActions";
 import { cn } from "@/utils/cn";
 
 type ReportDashboardProps = {
   reportId: string;
+};
+
+type SignatureDraft = {
+  signerName: string;
+  signedDate: string;
 };
 
 const panelClass =
@@ -46,11 +50,101 @@ function formatDateTime(value: string) {
   return date.toLocaleString();
 }
 
+function getTodayInputDate() {
+  const date = new Date();
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 10);
+}
+
+function formatSignedDate(value: string) {
+  if (!value) {
+    return "Not recorded";
+  }
+
+  const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (dateOnlyMatch) {
+    return `${dateOnlyMatch[2]}/${dateOnlyMatch[3]}/${dateOnlyMatch[1]}`;
+  }
+
+  return formatDateTime(value);
+}
+
 function StatusBadge({ status }: { status: string }) {
   return (
     <span className="inline-flex rounded-full bg-accent px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-accent-foreground ring-1 ring-primary/10">
       {status.replace(/_/g, " ")}
     </span>
+  );
+}
+
+function SignatureForm({
+  role,
+  title,
+  signature,
+  draft,
+  onDraftChange,
+  onSave,
+}: {
+  role: ReportSignatureRole;
+  title: string;
+  signature: StoredVotingReport["signatures"][ReportSignatureRole];
+  draft: SignatureDraft;
+  onDraftChange: (role: ReportSignatureRole, draft: SignatureDraft) => void;
+  onSave: (role: ReportSignatureRole) => Promise<void>;
+}) {
+  return (
+    <form
+      className="rounded-xl bg-muted/70 p-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void onSave(role);
+      }}
+    >
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="m-0 text-sm font-extrabold text-foreground">{title}</h3>
+        <span className="text-xs font-semibold text-muted-foreground">
+          {signature
+            ? `${signature.signerName} | ${formatSignedDate(signature.signedDate)}`
+            : "Not signed"}
+        </span>
+      </div>
+      <label className={labelClass} htmlFor={`${role}-signature-name`}>
+        Signature
+      </label>
+      <input
+        id={`${role}-signature-name`}
+        className="mb-3 mt-1 min-h-11 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+        required
+        type="text"
+        value={draft.signerName}
+        onChange={(event) =>
+          onDraftChange(role, {
+            ...draft,
+            signerName: event.target.value,
+          })
+        }
+      />
+      <label className={labelClass} htmlFor={`${role}-signature-date`}>
+        Date
+      </label>
+      <input
+        id={`${role}-signature-date`}
+        className="mb-4 mt-1 min-h-11 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+        required
+        type="date"
+        value={draft.signedDate}
+        onChange={(event) =>
+          onDraftChange(role, {
+            ...draft,
+            signedDate: event.target.value,
+          })
+        }
+      />
+      <button type="submit" className={buttonClass}>
+        <CheckCircle2 aria-hidden="true" size={18} />
+        Save {title}
+      </button>
+    </form>
   );
 }
 
@@ -193,6 +287,12 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
   const [report, setReport] = useState<StoredVotingReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [statusMessage, setStatusMessage] = useState("");
+  const [signatureDrafts, setSignatureDrafts] = useState<
+    Record<ReportSignatureRole, SignatureDraft>
+  >({
+    chair: { signerName: "", signedDate: getTodayInputDate() },
+    planner: { signerName: "", signedDate: getTodayInputDate() },
+  });
 
   async function refreshReport() {
     setIsLoading(true);
@@ -208,6 +308,25 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
     void refreshReport();
   }, [reportId]);
 
+  useEffect(() => {
+    if (!report) {
+      return;
+    }
+
+    setSignatureDrafts({
+      chair: {
+        signerName: report.signatures.chair?.signerName || report.report.chair || "",
+        signedDate: report.signatures.chair?.signedDate || getTodayInputDate(),
+      },
+      planner: {
+        signerName: report.signatures.planner?.signerName || report.report.planner || "",
+        signedDate: report.signatures.planner?.signedDate || getTodayInputDate(),
+      },
+    });
+  }, [
+    report,
+  ]);
+
   async function runDashboardAction(
     action: () => Promise<StoredVotingReport | null>,
     message: string,
@@ -216,6 +335,34 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
     const nextReport = await action();
     setReport(nextReport);
     setStatusMessage(message);
+  }
+
+  function updateSignatureDraft(role: ReportSignatureRole, draft: SignatureDraft) {
+    setSignatureDrafts((current) => ({
+      ...current,
+      [role]: draft,
+    }));
+  }
+
+  async function saveSignature(role: ReportSignatureRole) {
+    if (!report) {
+      return;
+    }
+
+    const roleLabel = role === "chair" ? "Chair" : "Planner";
+    const draft = signatureDrafts[role];
+    await runDashboardAction(
+      () =>
+        signReport({
+          data: {
+            reportId: report.id,
+            role,
+            signerName: draft.signerName,
+            signedDate: draft.signedDate,
+          },
+        }),
+      `${roleLabel} signature saved.`,
+    );
   }
 
   if (isLoading) {
@@ -315,25 +462,6 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
               className={buttonClass}
               onClick={() =>
                 runDashboardAction(
-                  () =>
-                    approveReportForChair({
-                      data: {
-                        reportId: report.id,
-                        comments: "Approved from report dashboard.",
-                      },
-                    }),
-                  "Approved for chair authorization.",
-                )
-              }
-            >
-              <ShieldCheck aria-hidden="true" size={18} />
-              Approve For Chair
-            </button>
-            <button
-              type="button"
-              className={buttonClass}
-              onClick={() =>
-                runDashboardAction(
                   () => finalizeReport({ data: { reportId: report.id } }),
                   "Report finalized.",
                 )
@@ -363,6 +491,29 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
             </button>
           </div>
         </section>
+        <section className={panelClass} aria-labelledby="dashboard-signatures-heading">
+          <h2 id="dashboard-signatures-heading" className="m-0 mb-4 text-lg font-extrabold text-foreground">
+            Signatures
+          </h2>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <SignatureForm
+              role="chair"
+              title="Chair Signature"
+              signature={report.signatures.chair}
+              draft={signatureDrafts.chair}
+              onDraftChange={updateSignatureDraft}
+              onSave={saveSignature}
+            />
+            <SignatureForm
+              role="planner"
+              title="Planner Signature"
+              signature={report.signatures.planner}
+              draft={signatureDrafts.planner}
+              onDraftChange={updateSignatureDraft}
+              onSave={saveSignature}
+            />
+          </div>
+        </section>
         <AgendaItems report={report} />
         <section className={panelClass} aria-labelledby="planner-notes-heading">
           <h2 id="planner-notes-heading" className="m-0 mb-4 text-lg font-extrabold text-foreground">
@@ -374,19 +525,11 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
         </section>
         <NotificationHistory report={report} />
         <WorkflowHistory report={report} />
-        <section className={panelClass} aria-labelledby="authorization-heading">
-          <h2 id="authorization-heading" className="m-0 mb-4 text-lg font-extrabold text-foreground">
-            Authorization
-          </h2>
-          {report.authorization ? (
-            <p className="m-0">
-              Authorized by <strong>{report.authorization.signerName}</strong> on{" "}
-              {formatDateTime(report.authorization.signedAt)}.
-            </p>
-          ) : (
-            <p className="m-0">No chair authorization recorded.</p>
-          )}
-          {report.finalizedPdf ? (
+        {report.finalizedPdf ? (
+          <section className={panelClass} aria-labelledby="final-pdf-heading">
+            <h2 id="final-pdf-heading" className="m-0 mb-4 text-lg font-extrabold text-foreground">
+              Final PDF
+            </h2>
             <p className="m-0 mt-3">
               <FileText aria-hidden="true" className="mr-2 inline-block" size={18} />
               Final PDF route:{" "}
@@ -394,8 +537,8 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
                 {report.finalizedPdf.pdfUrl}
               </a>
             </p>
-          ) : null}
-        </section>
+          </section>
+        ) : null}
       </div>
     </main>
   );
