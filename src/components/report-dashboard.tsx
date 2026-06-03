@@ -84,6 +84,7 @@ function SignatureForm({
   draft,
   onDraftChange,
   onSave,
+  canSign,
 }: {
   role: ReportSignatureRole;
   title: string;
@@ -91,15 +92,10 @@ function SignatureForm({
   draft: SignatureDraft;
   onDraftChange: (role: ReportSignatureRole, draft: SignatureDraft) => void;
   onSave: (role: ReportSignatureRole) => Promise<void>;
+  canSign: boolean;
 }) {
   return (
-    <form
-      className="rounded-xl bg-muted/70 p-4"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void onSave(role);
-      }}
-    >
+    <div className="rounded-xl bg-muted/70 p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h3 className="m-0 text-sm font-extrabold text-foreground">{title}</h3>
         <span className="text-xs font-semibold text-muted-foreground">
@@ -108,43 +104,55 @@ function SignatureForm({
             : "Not signed"}
         </span>
       </div>
-      <label className={labelClass} htmlFor={`${role}-signature-name`}>
-        Signature
-      </label>
-      <input
-        id={`${role}-signature-name`}
-        className="mb-3 mt-1 min-h-11 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
-        required
-        type="text"
-        value={draft.signerName}
-        onChange={(event) =>
-          onDraftChange(role, {
-            ...draft,
-            signerName: event.target.value,
-          })
-        }
-      />
-      <label className={labelClass} htmlFor={`${role}-signature-date`}>
-        Date
-      </label>
-      <input
-        id={`${role}-signature-date`}
-        className="mb-4 mt-1 min-h-11 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
-        required
-        type="date"
-        value={draft.signedDate}
-        onChange={(event) =>
-          onDraftChange(role, {
-            ...draft,
-            signedDate: event.target.value,
-          })
-        }
-      />
-      <button type="submit" className={buttonClass}>
-        <CheckCircle2 aria-hidden="true" size={18} />
-        Save {title}
-      </button>
-    </form>
+      
+      {canSign && !signature ? (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void onSave(role);
+          }}
+        >
+          <label className={labelClass} htmlFor={`${role}-signature-name`}>
+            Signature
+          </label>
+          <input
+            id={`${role}-signature-name`}
+            className="mb-3 mt-1 min-h-11 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+            required
+            type="text"
+            value={draft.signerName}
+            onChange={(event) =>
+              onDraftChange(role, {
+                ...draft,
+                signerName: event.target.value,
+              })
+            }
+          />
+          <label className={labelClass} htmlFor={`${role}-signature-date`}>
+            Date
+          </label>
+          <input
+            id={`${role}-signature-date`}
+            className="mb-4 mt-1 min-h-11 w-full rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15"
+            required
+            type="date"
+            value={draft.signedDate}
+            onChange={(event) =>
+              onDraftChange(role, {
+                ...draft,
+                signedDate: event.target.value,
+              })
+            }
+          />
+          <button type="submit" className={buttonClass}>
+            <CheckCircle2 aria-hidden="true" size={18} />
+            Save {title}
+          </button>
+        </form>
+      ) : (
+        signature ? null : <p className="text-sm text-muted-foreground">Awaiting signature via email link.</p>
+      )}
+    </div>
   );
 }
 
@@ -293,6 +301,20 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
     chair: { signerName: "", signedDate: getTodayInputDate() },
     planner: { signerName: "", signedDate: getTodayInputDate() },
   });
+  const [urlParams, setUrlParams] = useState<{ role: string | null; token: string | null }>({
+    role: null,
+    token: null,
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      setUrlParams({
+        role: params.get("role"),
+        token: params.get("token"),
+      });
+    }
+  }, []);
 
   async function refreshReport() {
     setIsLoading(true);
@@ -349,20 +371,30 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
       return;
     }
 
+    if (!urlParams.token || urlParams.role !== role) {
+      setStatusMessage("Missing or invalid signature token. Please use the link provided in your email.");
+      return;
+    }
+
     const roleLabel = role === "chair" ? "Chair" : "Planner";
     const draft = signatureDrafts[role];
-    await runDashboardAction(
-      () =>
-        signReport({
-          data: {
-            reportId: report.id,
-            role,
-            signerName: draft.signerName,
-            signedDate: draft.signedDate,
-          },
-        }),
-      `${roleLabel} signature saved.`,
-    );
+    try {
+      await runDashboardAction(
+        () =>
+          signReport({
+            data: {
+              reportId: report.id,
+              role,
+              token: urlParams.token!,
+              signerName: draft.signerName,
+              signedDate: draft.signedDate,
+            },
+          }),
+        `${roleLabel} signature saved.`,
+      );
+    } catch (e) {
+      setStatusMessage(e instanceof Error ? e.message : String(e));
+    }
   }
 
   if (isLoading) {
@@ -503,6 +535,7 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
               draft={signatureDrafts.chair}
               onDraftChange={updateSignatureDraft}
               onSave={saveSignature}
+              canSign={urlParams.role === "chair" && !!urlParams.token}
             />
             <SignatureForm
               role="planner"
@@ -511,6 +544,7 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
               draft={signatureDrafts.planner}
               onDraftChange={updateSignatureDraft}
               onSave={saveSignature}
+              canSign={urlParams.role === "planner" && !!urlParams.token}
             />
           </div>
         </section>

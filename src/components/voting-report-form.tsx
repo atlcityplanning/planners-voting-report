@@ -1,19 +1,19 @@
 import {
   ChevronDown,
-  Clipboard,
-  ExternalLink,
   GripVertical,
   LayoutDashboard,
   Mail,
   MessageSquarePlus,
   Plus,
-  Printer,
   RotateCcw,
   Send,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, FocusEvent, FormEvent, KeyboardEvent } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import jsPDF from "jspdf";
+import { toCanvas } from "html-to-image";
 import {
   INITIAL_REPORT_STATE,
   ITEM_TYPES,
@@ -21,7 +21,6 @@ import {
   RECOMMENDATIONS,
   applyApplicationTemplate,
   getApplicationDefaults,
-  getPlannerScriptUrl,
   getReportPrintLabels,
   normalizeItemType,
   normalizeRecommendation,
@@ -42,8 +41,6 @@ import { cn } from "@/utils/cn";
 
 const LEGACY_STORAGE_KEY = "npu-voting-report:v1";
 const INITIAL_REPORT_JSON = JSON.stringify(INITIAL_REPORT_STATE);
-const UPDATES_URL =
-  "https://www.atlantaga.gov/government/departments/city-planning/neighborhood-planning-units/updates";
 
 type NewItemForm = {
   itemType: ItemType | "";
@@ -65,26 +62,26 @@ const EMPTY_SUBMISSION_RECIPIENTS: SubmissionRecipients = {
   npuTeamEmail: "",
 };
 
-const labelClass = "text-[10px] font-bold uppercase tracking-wide text-muted-foreground";
-const printLabelClass = `${labelClass} print:text-black`;
-const sectionHeadingClass = "m-0 text-base font-extrabold text-foreground print:text-black";
+const labelClass = "text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black";
+const printLabelClass = labelClass;
+const sectionHeadingClass = "m-0 mb-6 text-2xl font-bold uppercase tracking-wide text-foreground print:text-black";
 const reportPanelClass =
-  "mb-4 rounded-2xl bg-card p-4 text-sm text-muted-foreground shadow-sm ring-1 ring-border print:mb-4 print:rounded-none print:p-0 print:shadow-none print:ring-0";
+  "mb-8 border-2 border-foreground bg-card p-6 text-sm text-foreground print:mb-6 print:border-0 print:p-0";
 const screenPanelClass =
-  "mb-4 rounded-2xl bg-card p-4 text-sm text-muted-foreground shadow-sm ring-1 ring-border print:hidden";
+  "mb-8 border-2 border-foreground bg-card p-6 text-sm text-foreground print:hidden";
 const fieldClass =
-  "min-h-11 w-full rounded-xl border border-input bg-card px-3 py-2 text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/15 print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:shadow-none print:ring-0";
+  "min-h-11 w-full border-2 border-foreground bg-card px-3 py-2 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:ring-0 rounded-none";
 const selectFieldClass = cn(fieldClass, "appearance-none pr-10");
 const screenFieldClass =
-  "min-h-11 w-full rounded-xl border border-input bg-card px-3 py-2 text-foreground shadow-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/15";
+  "min-h-11 w-full border-2 border-foreground bg-card px-3 py-2 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary rounded-none";
 const subtleButtonClass =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold text-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-muted hover:text-primary focus:outline-none focus:ring-4 focus:ring-primary/15";
+  "inline-flex min-h-11 items-center justify-center gap-2 border-2 border-foreground bg-card px-5 py-2 text-sm font-bold uppercase tracking-wide text-foreground transition-colors hover:bg-foreground hover:text-background focus:outline-none focus:ring-2 focus:ring-primary rounded-none";
 const primaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-lg shadow-primary/15 transition-colors hover:bg-primary/90 focus:outline-none focus:ring-4 focus:ring-primary/20";
+  "inline-flex min-h-11 items-center justify-center gap-2 border-2 border-primary bg-primary px-5 py-2 text-sm font-bold uppercase tracking-wide text-primary-foreground transition-colors hover:bg-foreground hover:border-foreground focus:outline-none focus:ring-2 focus:ring-primary rounded-none";
 const inlineEditClass =
-  "w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-foreground outline-none transition focus:border-primary focus:bg-card focus:ring-4 focus:ring-primary/15 print:border-0 print:bg-transparent print:p-0 print:ring-0";
+  "w-full border-b-2 border-transparent bg-transparent px-2 py-1 text-foreground outline-none transition focus:border-primary focus:bg-muted print:border-0 print:bg-transparent print:p-0 rounded-none";
 const iconButtonClass =
-  "inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-sm transition-colors focus:outline-none focus:ring-4 focus:ring-primary/15";
+  "inline-flex h-10 w-10 items-center justify-center border-2 border-foreground bg-card text-foreground transition-colors hover:bg-foreground hover:text-background focus:outline-none focus:ring-2 focus:ring-primary rounded-none";
 
 function createItemId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -238,7 +235,6 @@ export default function VotingReportForm() {
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dialogMessage, setDialogMessage] = useState("");
-  const [copiedUpdatesLink, setCopiedUpdatesLink] = useState(false);
   const [openCommentIds, setOpenCommentIds] = useState<Array<string>>([]);
   const [submissionRecipients, setSubmissionRecipients] = useState<SubmissionRecipients>(
     EMPTY_SUBMISSION_RECIPIENTS,
@@ -252,12 +248,12 @@ export default function VotingReportForm() {
   const dateInputRef = useRef<HTMLInputElement>(null);
   const pendingHydrationJsonRef = useRef("");
   const lastPersistedReportJsonRef = useRef("");
+  const navigate = useNavigate();
 
   const printLabels = useMemo(
     () => getReportPrintLabels(report.npu, report.meetingDate),
     [report.meetingDate, report.npu],
   );
-  const plannerScriptUrl = useMemo(() => getPlannerScriptUrl(report.npu), [report.npu]);
   const pendingCount = useMemo(
     () => report.items.filter((item) => item.recommendation === "PENDING").length,
     [report.items],
@@ -267,6 +263,7 @@ export default function VotingReportForm() {
     [savedDrafts],
   );
   const reportTitle = report.meetingDate ? printLabels.headerTitle : "VOTING REPORT";
+  const isFormValid = Boolean(report.meetingDate && report.chair?.trim() && report.planner?.trim());
 
   useEffect(() => {
     let isMounted = true;
@@ -361,15 +358,6 @@ export default function VotingReportForm() {
 
     lastPersistedReportJsonRef.current = serializedReport;
   }, [hasLoadedStorage, serializedReport]);
-
-  useEffect(() => {
-    if (!copiedUpdatesLink) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => setCopiedUpdatesLink(false), 1200);
-    return () => window.clearTimeout(timeout);
-  }, [copiedUpdatesLink]);
 
   useEffect(() => {
     function beforePrint() {
@@ -535,32 +523,6 @@ export default function VotingReportForm() {
     setDraggingId(null);
   }
 
-  async function copyUpdatesLink() {
-    try {
-      await navigator.clipboard.writeText(UPDATES_URL);
-      setCopiedUpdatesLink(true);
-    } catch {
-      showDialog("Unable to copy the updates link from this browser.");
-    }
-  }
-
-  function handlePrint() {
-    if (!report.meetingDate) {
-      dateInputRef.current?.focus();
-      dateInputRef.current?.showPicker?.();
-      return;
-    }
-
-    if (
-      pendingCount > 0 &&
-      !window.confirm("Some items do not have recommendations. Print the report anyway?")
-    ) {
-      return;
-    }
-
-    window.print();
-  }
-
   async function prepareSubmission() {
     if (!report.meetingDate) {
       dateInputRef.current?.focus();
@@ -595,7 +557,35 @@ export default function VotingReportForm() {
   async function handleSubmitForReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmittingReport(true);
-    setSubmissionMessage("");
+    setSubmissionMessage("Generating PDF...");
+
+    let pdfBase64: string | undefined;
+    try {
+      const mainElement = document.querySelector("main");
+      if (mainElement) {
+        // Temporarily hide UI elements not meant for the PDF
+        const hiddenElements = Array.from(mainElement.querySelectorAll(".print\\:hidden")) as HTMLElement[];
+        hiddenElements.forEach(el => { el.style.display = 'none'; });
+
+        const canvas = await toCanvas(mainElement, { pixelRatio: 2 });
+        
+        hiddenElements.forEach(el => { el.style.display = ''; });
+
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "px",
+          format: [canvas.width / 2, canvas.height / 2]
+        });
+        pdf.addImage(canvas.toDataURL("image/jpeg", 1.0), "JPEG", 0, 0, canvas.width / 2, canvas.height / 2);
+        
+        const dataUri = pdf.output("datauristring");
+        pdfBase64 = dataUri.split(",")[1];
+      }
+    } catch (err) {
+      console.warn("PDF generation failed:", err);
+    }
+
+    setSubmissionMessage("Submitting report...");
 
     try {
       const submittedReport = await submitForReview({
@@ -603,6 +593,7 @@ export default function VotingReportForm() {
           reportId: submittedReportId || undefined,
           report,
           recipients: submissionRecipients,
+          pdfBase64,
         },
       });
 
@@ -616,6 +607,9 @@ export default function VotingReportForm() {
         form.setFieldValue(key, newReport[key]);
       });
       setSubmissionMessage("Submitted for review. Notification attempts were logged.");
+      
+      submissionDialogRef.current?.close();
+      navigate({ to: `/dashboard/${submittedReport.id}` });
     } catch (error) {
       setSubmissionMessage(error instanceof Error ? error.message : "Unable to submit report.");
     } finally {
@@ -757,23 +751,6 @@ export default function VotingReportForm() {
               <RotateCcw aria-hidden="true" size={18} />
               Clear Table
             </button>
-            <button
-              type="button"
-              className={cn(primaryButtonClass, "sm:min-w-24")}
-              onClick={handlePrint}
-            >
-              <Printer aria-hidden="true" size={18} />
-              Print
-            </button>
-            <button
-              type="button"
-              className={cn(primaryButtonClass, "sm:min-w-32")}
-              onClick={prepareSubmission}
-              disabled={isPreparingSubmission}
-            >
-              <Mail aria-hidden="true" size={18} />
-              {isPreparingSubmission ? "Preparing" : "Submit"}
-            </button>
           </div>
         </div>
       </header>
@@ -882,7 +859,7 @@ export default function VotingReportForm() {
             <form.Field name="autofill">
               {(field) => (
                 <input
-                  className="relative h-7 w-12 appearance-none rounded-full border border-input bg-muted p-0 transition checked:border-primary checked:bg-accent before:absolute before:left-1 before:top-1 before:h-5 before:w-5 before:rounded-full before:bg-muted-foreground before:transition checked:before:translate-x-5 checked:before:bg-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
+                  className="relative h-7 w-12 appearance-none rounded-full border border-input bg-transparent p-0 transition checked:border-primary before:absolute before:left-1 before:top-1 before:h-5 before:w-5 before:rounded-full before:bg-muted-foreground before:transition checked:before:translate-x-5 checked:before:bg-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
                   checked={field.state.value}
                   onChange={(event) => handleAutofillChange(event.target.checked)}
                   onBlur={field.handleBlur}
@@ -1209,35 +1186,16 @@ export default function VotingReportForm() {
         ) : null}
       </section>
 
-      <section
-        className="mt-4 flex flex-col items-stretch justify-center gap-2 sm:flex-row sm:items-center print:hidden"
-        aria-label="Report links"
-      >
-        <a
-          href={plannerScriptUrl}
-          className={cn(subtleButtonClass, "no-underline")}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Planner's Script
-          <ExternalLink aria-hidden="true" size={16} />
-        </a>
-        <a
-          href={UPDATES_URL}
-          className={cn(subtleButtonClass, "no-underline")}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Updates Page
-          <ExternalLink aria-hidden="true" size={16} />
-        </a>
+
+      <section className={cn("mt-8 flex justify-end print:hidden", !isFormValid && "hidden")}>
         <button
           type="button"
-          className={subtleButtonClass}
-          onClick={copyUpdatesLink}
+          className={cn(primaryButtonClass, "w-full sm:w-auto sm:min-w-32")}
+          onClick={prepareSubmission}
+          disabled={!isFormValid || isPreparingSubmission}
         >
-          <Clipboard aria-hidden="true" size={16} />
-          {copiedUpdatesLink ? "Copied" : "Copy Updates Link"}
+          <Mail aria-hidden="true" size={18} />
+          {isPreparingSubmission ? "Preparing" : "Submit"}
         </button>
       </section>
 

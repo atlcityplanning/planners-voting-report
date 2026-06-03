@@ -1004,6 +1004,26 @@ export async function getReportByToken(token: string) {
   return getD1Report(db, tokenRow.report_id);
 }
 
+export async function consumeSignatureToken(token: string, reportId: string, role: ReportSignatureRole) {
+  const db = getD1();
+  const purpose = `${role}_signature`;
+  if (!db) {
+    const tokenRecord = memoryTokens.get(token);
+    if (!tokenRecord || tokenRecord.expiresAt <= nowIso() || tokenRecord.purpose !== purpose || tokenRecord.reportId !== reportId) {
+      return false;
+    }
+    memoryTokens.delete(token);
+    return true;
+  }
+
+  await ensureSchema(db);
+  const result = await db.prepare(
+    "DELETE FROM review_tokens WHERE token = ? AND report_id = ? AND purpose = ? AND expires_at > ?"
+  ).bind(token, reportId, purpose, nowIso()).run();
+
+  return result.meta.changes > 0;
+}
+
 export async function attachFinalizedPdfMetadata(reportId: string) {
   const report = await getReport(reportId);
   if (!report) {
@@ -1050,4 +1070,30 @@ export async function attachFinalizedPdfMetadata(reportId: string) {
     .run();
 
   return updateReportStatus(reportId, "finalized", { finalizedAt: createdAt });
+}
+
+export async function getActiveMondayBoardConfig() {
+  const db = getD1();
+  if (!db) {
+    const keys = Array.from(memoryMondayProvisioningKeys.values());
+    const completed = keys.filter((k) => k.status === "completed").sort((a, b) => b.completedAt.localeCompare(a.completedAt));
+    if (completed.length === 0) return null;
+    try {
+      return JSON.parse(completed[0].resultJson);
+    } catch {
+      return null;
+    }
+  }
+
+  await ensureSchema(db);
+  const row = await db.prepare(
+    "SELECT result_json FROM monday_provisioning_keys WHERE status = 'completed' ORDER BY completed_at DESC LIMIT 1"
+  ).first<{ result_json: string }>();
+
+  if (!row) return null;
+  try {
+    return JSON.parse(row.result_json);
+  } catch {
+    return null;
+  }
 }

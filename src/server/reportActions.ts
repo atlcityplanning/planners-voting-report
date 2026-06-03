@@ -4,6 +4,7 @@ import { getSubmissionRecipients as resolveSubmissionRecipients } from "@/server
 import {
   createMondayVotingReportBoard,
   createMondayVotingReportBoardInputSchema,
+  pushReportToMonday,
 } from "@/server/monday";
 import { getAppEnv, getNpuTeamSubmissionEmail } from "@/server/platform";
 import { sendSubmissionNotifications } from "@/server/reportEmail";
@@ -12,9 +13,11 @@ import {
   attachFinalizedPdfMetadata,
   completeMondayProvisioningKey,
   consumeMondayProvisioningKey,
+  consumeSignatureToken,
   createReportRevision,
   createReviewToken,
   failMondayProvisioningKey,
+  getActiveMondayBoardConfig,
   getReport,
   getReportByToken,
   listReports,
@@ -107,6 +110,11 @@ export const submitForReview = createServerFn({ method: "POST" })
     await createReviewToken(report.id, "review", report.npuTeamEmail);
     await sendSubmissionNotifications(report);
 
+    const boardConfig = await getActiveMondayBoardConfig();
+    if (boardConfig) {
+      await pushReportToMonday(boardConfig, report, data.pdfBase64);
+    }
+
     return (await getReport(report.id)) ?? report;
   });
 
@@ -153,6 +161,11 @@ export const requestReportChanges = createServerFn({ method: "POST" })
 export const signReport = createServerFn({ method: "POST" })
   .inputValidator(reportSignatureInputSchema)
   .handler(async ({ data }) => {
+    const isValidToken = await consumeSignatureToken(data.token, data.reportId, data.role);
+    if (!isValidToken) {
+      throw new Error("Invalid or expired signature token. Please use the link provided in your email.");
+    }
+
     const report = await saveReportSignature(data.reportId, {
       role: data.role,
       signerName: data.signerName,

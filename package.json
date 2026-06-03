@@ -36,7 +36,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
+    "html-to-image": "^1.11.13",
+    "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.17.0",
     "nodemailer": "^8.0.10",
     "radix-ui": "^1.4.3",
@@ -54,6 +57,7 @@
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.2.8",
+    "@playwright/cli": "^0.1.13",
     "@react-email/preview-server": "5.2.8",
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/devtools-vite": "latest",

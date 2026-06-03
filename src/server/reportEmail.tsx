@@ -14,13 +14,14 @@ import nodemailer from "nodemailer";
 
 import type { NotificationAttempt, StoredVotingReport } from "@/lib/votingReportWorkflow";
 import { getAppEnv, getPublicAppUrl } from "@/server/platform";
-import { addNotificationAttempt } from "@/server/reportStorage";
+import { addNotificationAttempt, createReviewToken } from "@/server/reportStorage";
 
 type RecipientRole = NotificationAttempt["recipientRole"];
 
 type SubmissionEmailProps = {
   report: StoredVotingReport;
   dashboardUrl: string;
+  isSignatureRequest?: boolean;
 };
 
 function formatRecommendationCounts(report: StoredVotingReport) {
@@ -34,7 +35,7 @@ function formatRecommendationCounts(report: StoredVotingReport) {
     .join(" | ");
 }
 
-export function VotingReportSubmissionEmail({ report, dashboardUrl }: SubmissionEmailProps) {
+export function VotingReportSubmissionEmail({ report, dashboardUrl, isSignatureRequest }: SubmissionEmailProps) {
   const summary = `NPU ${report.report.npu} voting report submitted for review.`;
 
   return (
@@ -112,7 +113,7 @@ export function VotingReportSubmissionEmail({ report, dashboardUrl }: Submission
 
             <Section className="mt-4 rounded-2xl bg-white p-6 shadow-sm">
               <Text className="m-0 text-sm leading-6 text-slate-700">
-                Review the report dashboard:
+                {isSignatureRequest ? "Click here to review and securely sign the report:" : "Review the report dashboard:"}
               </Text>
               <Text className="m-0 text-sm font-bold leading-6 text-blue-700">{dashboardUrl}</Text>
             </Section>
@@ -123,7 +124,7 @@ export function VotingReportSubmissionEmail({ report, dashboardUrl }: Submission
   );
 }
 
-export function generateSubmissionEmailText(report: StoredVotingReport, dashboardUrl: string) {
+export function generateSubmissionEmailText(report: StoredVotingReport, dashboardUrl: string, isSignatureRequest?: boolean) {
   const itemLines = report.report.items.map(
     (item) =>
       `- ${item.itemType} | ${item.applicationName} | ${item.recommendation}${
@@ -147,7 +148,8 @@ export function generateSubmissionEmailText(report: StoredVotingReport, dashboar
     "Agenda Items:",
     itemLines.length > 0 ? itemLines.join("\n") : "No agenda items were submitted.",
     "",
-    `Dashboard: ${dashboardUrl}`,
+    isSignatureRequest ? "Review and Sign the report:" : "Dashboard:",
+    dashboardUrl,
   ].join("\n");
 }
 
@@ -194,10 +196,23 @@ async function sendOneSubmissionEmail(
   });
 
   try {
+    let actionUrl = dashboardUrl;
+    let isSignatureRequest = false;
+
+    if (recipientRole === "chair" && !report.signatures.chair) {
+      const tokenRecord = await createReviewToken(report.id, "chair_signature", recipientEmail);
+      actionUrl = `${getPublicAppUrl()}/dashboard/${report.id}?token=${tokenRecord.token}&role=chair`;
+      isSignatureRequest = true;
+    } else if (recipientRole === "planner" && !report.signatures.planner) {
+      const tokenRecord = await createReviewToken(report.id, "planner_signature", recipientEmail);
+      actionUrl = `${getPublicAppUrl()}/dashboard/${report.id}?token=${tokenRecord.token}&role=planner`;
+      isSignatureRequest = true;
+    }
+
     const html = await render(
-      <VotingReportSubmissionEmail report={report} dashboardUrl={dashboardUrl} />,
+      <VotingReportSubmissionEmail report={report} dashboardUrl={actionUrl} isSignatureRequest={isSignatureRequest} />,
     );
-    const text = generateSubmissionEmailText(report, dashboardUrl);
+    const text = generateSubmissionEmailText(report, actionUrl, isSignatureRequest);
 
     await transporter.sendMail({
       to: recipientEmail,

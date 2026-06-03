@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { getAppEnv } from "@/server/platform";
+import { getAppEnv, getPublicAppUrl } from "@/server/platform";
+import type { StoredVotingReport } from "@/lib/votingReportWorkflow";
 
 const MONDAY_API_URL = "https://api.monday.com/v2";
 const DEFAULT_MONDAY_API_VERSION = "2025-10";
@@ -318,3 +319,139 @@ export async function createMondayVotingReportBoard(
     columns,
   };
 }
+
+export async function createMondayItem(
+  clientOptions: MondayClientOptions,
+  boardId: string,
+  groupId: string,
+  itemName: string,
+  columnValues: Record<string, unknown>,
+) {
+  const query = `mutation CreateItem($boardId: ID!, $groupId: String!, $itemName: String!, $columnValues: JSON!) {
+    create_item(
+      board_id: $boardId,
+      group_id: $groupId,
+      item_name: $itemName,
+      column_values: $columnValues
+    ) {
+      id
+    }
+  }`;
+
+  const data = await mondayQuery<{ create_item: { id: string } }>(clientOptions, query, {
+    boardId,
+    groupId,
+    itemName,
+    columnValues: JSON.stringify(columnValues),
+  });
+
+  return data.create_item.id;
+}
+
+export async function uploadFileToMondayItem(
+  clientOptions: MondayClientOptions,
+  itemId: string,
+  columnId: string,
+  pdfBase64: string,
+) {
+  const binaryString = atob(pdfBase64);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const blob = new Blob([bytes], { type: "application/pdf" });
+
+  const query = `mutation add_file($file: File!) { add_file_to_column (item_id: ${itemId}, column_id: "${columnId}", file: $file) { id } }`;
+  
+  const formData = new FormData();
+  formData.append("query", query);
+  formData.append("variables[file]", blob, "voting-report.pdf");
+
+  const response = await fetch("https://api.monday.com/v2/file", {
+    method: "POST",
+    headers: {
+      Authorization: clientOptions.token,
+      "API-Version": clientOptions.apiVersion,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`monday.com API file upload failed with status ${response.status}.`);
+  }
+
+  const body = await response.json().catch(() => null) as MondayGraphqlResponse<{ add_file_to_column: { id: string } }> | null;
+  
+  if (body?.errors?.length) {
+    const message = body.errors.map((error) => error.message).filter(Boolean).join(" ");
+    throw new Error(message || "monday.com API returned a GraphQL error on file upload.");
+  }
+}
+
+export async function pushReportToMonday(
+  boardConfig: MondayVotingReportBoardConfig,
+  report: StoredVotingReport,
+  pdfBase64?: string,
+) {
+  const appEnv = getAppEnv();
+  const token = appEnv.MONDAY_API_TOKEN;
+  if (!token) {
+    console.warn("MONDAY_API_TOKEN is not configured, skipping monday sync.");
+    return;
+  }
+
+  const clientOptions = {
+    token,
+    apiVersion: appEnv.MONDAY_API_VERSION || DEFAULT_MONDAY_API_VERSION,
+  };
+
+  const appUrl = getPublicAppUrl();
+
+  const columnValues: Record<string, unknown> = {
+    [boardConfig.columns.npu.id]: report.report.npu,
+    [boardConfig.columns.meetingDate.id]: { date: report.report.meetingDate || new Date().toISOString().split("T")[0] },
+    [boardConfig.columns.planner.id]: report.report.planner,
+    [boardConfig.columns.chair.id]: report.report.chair,
+  };
+  
+  if (report.plannerEmail) {
+    columnValues[boardConfig.columns.plannerEmail.id] = { email: report.plannerEmail, text: report.plannerEmail };
+  }
+  if (report.chairEmail) {
+    columnValues[boardConfig.columns.chairEmail.id] = { email: report.chairEmail, text: report.chairEmail };
+  }
+  if (report.npuTeamEmail) {
+    columnValues[boardConfig.columns.npuTeamEmail.id] = { email: report.npuTeamEmail, text: report.npuTeamEmail };
+  }
+
+  columnValues[boardConfig.columns.submittedAt.id] = { date: (report.submittedAt || report.createdAt).split("T")[0] };
+  columnValues[boardConfig.columns.agendaItemCount.id] = report.report.items.length;
+  columnValues[boardConfig.columns.reportLink.id] = { url: `${appUrl}/dashboard/${report.id}`, text: "View Dashboard" };
+  columnValues[boardConfig.columns.reportStatus.id] = { label: "Submitted for Review" };
+  
+  if (report.report.plannerNotes) {
+    columnValues[boardConfig.columns.plannerNotes.id] = report.report.plannerNotes;
+  }
+
+  const itemId = await createMondayItem(
+    clientOptions,
+    boardConfig.board.id,
+    boardConfig.groups.submittedForReview.id,
+    `Report: NPU ${report.report.npu} - ${report.report.meetingDate || "Pending"}`,
+    columnValues,
+  );
+
+  if (pdfBase64) {
+    try {
+      await uploadFileToMondayItem(
+        clientOptions,
+        itemId,
+        boardConfig.columns.generatedPdf.id,
+        pdfBase64
+      );
+    } catch (err) {
+      console.error("Failed to upload PDF to Monday item:", err);
+    }
+  }
+}
+

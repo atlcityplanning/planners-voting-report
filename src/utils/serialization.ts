@@ -9,7 +9,7 @@ export function encodeRequest(data: IntakeFormData): string {
   const safeAssets = data.assets?.map((asset) => {
     if (asset.type === "file") {
       // Return metadata only for files to keep URL size down
-      const { url, ...metadata } = asset;
+      const { url: _url, ...metadata } = asset;
       return metadata;
     }
     // Links are fine as is

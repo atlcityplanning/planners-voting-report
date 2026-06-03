@@ -70,6 +70,8 @@ export type StoredVotingReport = {
   notificationAttempts: Array<NotificationAttempt>;
   workflowEvents: Array<WorkflowEvent>;
   signatures: Record<ReportSignatureRole, ReportSignature | null>;
+  chairSignatureToken: string | null;
+  plannerSignatureToken: string | null;
   finalizedPdf: FinalizedPdfMetadata | null;
 };
 
@@ -154,6 +156,7 @@ export const submitForReviewInputSchema = z.object({
     plannerEmail: emailRecipientSchema.optional().default(""),
     npuTeamEmail: emailRecipientSchema,
   }),
+  pdfBase64: z.string().optional(),
 });
 
 export const reportIdInputSchema = z.object({
@@ -174,6 +177,7 @@ export const reviewInputSchema = z.object({
 export const reportSignatureInputSchema = z.object({
   reportId: z.string().min(1),
   role: z.enum(["chair", "planner"]),
+  token: z.string().min(1, "Valid signature token is required."),
   signerName: z.string().trim().min(1, "Signature name is required."),
   signedDate: z.iso.date("Signature date is required."),
 });
