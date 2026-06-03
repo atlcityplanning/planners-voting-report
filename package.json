@@ -1,5 +1,5 @@
 {
-  "name": "npu-planners-voting-report",
+  "name": "planners-voting-report",
   "private": true,
   "type": "module",
   "imports": {
@@ -37,6 +37,7 @@
     "date-fns": "^4.4.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^1.17.0",
+    "nodemailer": "^8.0.10",
     "radix-ui": "^1.4.3",
     "react": "^19.2.0",
     "react-day-picker": "^10.0.1",

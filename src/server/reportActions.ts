@@ -1,7 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { getSubmissionRecipients as resolveSubmissionRecipients } from "@/server/npuContacts";
-import { getNpuTeamSubmissionEmail } from "@/server/platform";
+import {
+  createMondayVotingReportBoard,
+  createMondayVotingReportBoardInputSchema,
+} from "@/server/monday";
+import { getAppEnv, getNpuTeamSubmissionEmail } from "@/server/platform";
 import { sendSubmissionNotifications } from "@/server/reportEmail";
 import {
   addAuthorizationRecord,
@@ -29,6 +33,25 @@ export const getSubmissionRecipients = createServerFn({ method: "POST" })
   .inputValidator(getSubmissionRecipientsInputSchema)
   .handler(async ({ data }) => {
     return resolveSubmissionRecipients(data.npu, getNpuTeamSubmissionEmail());
+  });
+
+export const provisionMondayVotingReportBoard = createServerFn({ method: "POST" })
+  .inputValidator(createMondayVotingReportBoardInputSchema)
+  .handler(async ({ data }) => {
+    const appEnv = getAppEnv();
+
+    if (!appEnv.MONDAY_PROVISIONING_KEY) {
+      throw new Error("MONDAY_PROVISIONING_KEY is not configured.");
+    }
+
+    if (data.provisioningKey !== appEnv.MONDAY_PROVISIONING_KEY) {
+      throw new Error("Invalid monday.com provisioning key.");
+    }
+
+    return createMondayVotingReportBoard({
+      ...data,
+      workspaceId: data.workspaceId ?? appEnv.MONDAY_WORKSPACE_ID,
+    });
   });
 
 export const submitForReview = createServerFn({ method: "POST" })

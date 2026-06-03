@@ -58,7 +58,16 @@ KV, D1, R2, and Durable Object bindings are configured in `wrangler.jsonc` — s
 
 The D1 workflow stores submitted reports, agenda items, review history, notification attempts, authorization records, revisions, and finalized print-route metadata. If the Email Sending binding is unavailable, submissions still save and the dashboard logs skipped notification attempts.
 
+## monday.com Board Provisioning
 
+The server includes a guarded one-time provisioning function for creating the NPU voting report board in monday.com. Configure these values before calling it:
+
+```bash
+wrangler secret put MONDAY_API_TOKEN
+wrangler secret put MONDAY_PROVISIONING_KEY
+```
+
+Set `MONDAY_WORKSPACE_ID` if the board should be created outside the token user's default workspace. The provisioning function creates the board, workflow groups, status column, report metadata columns, link columns, and PDF file column, then returns the board ID plus group and column IDs to store for item sync.
 
 ## Routing
 

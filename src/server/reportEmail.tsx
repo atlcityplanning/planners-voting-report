@@ -10,6 +10,7 @@ import {
   Text,
   render,
 } from "@react-email/components";
+import nodemailer from "nodemailer";
 
 import type { NotificationAttempt, StoredVotingReport } from "@/lib/votingReportWorkflow";
 import { getAppEnv, getPublicAppUrl } from "@/server/platform";
@@ -152,7 +153,7 @@ export function generateSubmissionEmailText(report: StoredVotingReport, dashboar
 
 function getFromAddress() {
   const appEnv = getAppEnv();
-  return appEnv.NOTIFICATION_FROM_EMAIL || appEnv.WORK_EMAIL || "NPUMail@AtlantaGa.Gov";
+  return `"NPU Planner's Voting Report" <${appEnv.GMAIL_USER ?? appEnv.NOTIFICATION_FROM_EMAIL ?? "NPUMail@AtlantaGa.Gov"}>`;
 }
 
 async function sendOneSubmissionEmail(
@@ -174,15 +175,23 @@ async function sendOneSubmissionEmail(
     });
   }
 
-  if (!appEnv.EMAIL) {
+  if (!appEnv.GMAIL_USER || !appEnv.GMAIL_PASS) {
     return addNotificationAttempt(report.id, {
       recipientEmail,
       recipientRole,
       status: "skipped",
       subject,
-      error: "Cloudflare Email Sending binding is not configured.",
+      error: "Gmail credentials are not configured.",
     });
   }
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: appEnv.GMAIL_USER,
+      pass: appEnv.GMAIL_PASS,
+    },
+  });
 
   try {
     const html = await render(
@@ -190,9 +199,9 @@ async function sendOneSubmissionEmail(
     );
     const text = generateSubmissionEmailText(report, dashboardUrl);
 
-    await appEnv.EMAIL.send({
+    await transporter.sendMail({
       to: recipientEmail,
-      from: { email: getFromAddress(), name: "NPU Planner's Voting Report" },
+      from: getFromAddress(),
       subject,
       html,
       text,

@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "npu-planners-voting-report",
+  "name": "planners-voting-report",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
@@ -15,11 +15,6 @@
       "database_name": "npu-planners-voting-report",
       "database_id": "af994d19-782f-4293-b5f3-cfcbad9cdf27",
       "migrations_dir": "migrations",
-    },
-  ],
-  "send_email": [
-    {
-      "name": "EMAIL",
     },
   ],
 }

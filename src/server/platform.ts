@@ -2,10 +2,15 @@ import { env } from "cloudflare:workers";
 
 type AppEnv = Cloudflare.Env & {
   NPU_REPORTS_DB?: D1Database;
-  EMAIL?: SendEmail;
+  GMAIL_USER?: string;
+  GMAIL_PASS?: string;
   NPU_TEAM_SUBMISSION_EMAIL?: string;
   NOTIFICATION_FROM_EMAIL?: string;
   PUBLIC_APP_URL?: string;
+  MONDAY_API_TOKEN?: string;
+  MONDAY_API_VERSION?: string;
+  MONDAY_PROVISIONING_KEY?: string;
+  MONDAY_WORKSPACE_ID?: string;
 };
 
 export function getAppEnv(): AppEnv {
