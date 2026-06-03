@@ -67,7 +67,9 @@ wrangler secret put MONDAY_API_TOKEN
 wrangler secret put MONDAY_PROVISIONING_KEY
 ```
 
-Set `MONDAY_WORKSPACE_ID` if the board should be created outside the token user's default workspace. The provisioning function creates the board, workflow groups, status column, report metadata columns, link columns, and PDF file column, then returns the board ID plus group and column IDs to store for item sync.
+Set `MONDAY_WORKSPACE_ID` if the board should be created outside the token user's default workspace. The provisioning key is single-use: the app stores a hash of the key before calling monday.com, and the same key cannot create another board after either a successful or failed provisioning attempt. Rotate `MONDAY_PROVISIONING_KEY` before provisioning a second board.
+
+The provisioning function creates the board, workflow groups, status column, report metadata columns, link columns, and PDF file column, then returns the board ID plus group and column IDs to store for item sync.
 
 ## Routing
 

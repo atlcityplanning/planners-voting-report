@@ -11,8 +11,11 @@ import {
   addAuthorizationRecord,
   addWorkflowEvent,
   attachFinalizedPdfMetadata,
+  completeMondayProvisioningKey,
+  consumeMondayProvisioningKey,
   createReportRevision,
   createReviewToken,
+  failMondayProvisioningKey,
   getReport,
   getReportByToken,
   listReports,
@@ -28,6 +31,14 @@ import {
   submitForReviewInputSchema,
   tokenInputSchema,
 } from "@/lib/votingReportWorkflow";
+
+async function hashProvisioningKey(provisioningKey: string) {
+  const bytes = new TextEncoder().encode(provisioningKey);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
 
 export const getSubmissionRecipients = createServerFn({ method: "POST" })
   .inputValidator(getSubmissionRecipientsInputSchema)
@@ -48,10 +59,29 @@ export const provisionMondayVotingReportBoard = createServerFn({ method: "POST" 
       throw new Error("Invalid monday.com provisioning key.");
     }
 
-    return createMondayVotingReportBoard({
-      ...data,
-      workspaceId: data.workspaceId ?? appEnv.MONDAY_WORKSPACE_ID,
-    });
+    const keyHash = await hashProvisioningKey(data.provisioningKey);
+    await consumeMondayProvisioningKey(keyHash);
+
+    try {
+      const result = await createMondayVotingReportBoard({
+        ...data,
+        workspaceId: data.workspaceId ?? appEnv.MONDAY_WORKSPACE_ID,
+      });
+
+      await completeMondayProvisioningKey(keyHash, {
+        boardId: result.board.id,
+        boardUrl: result.board.url,
+        resultJson: JSON.stringify(result),
+      });
+
+      return result;
+    } catch (error) {
+      await failMondayProvisioningKey(
+        keyHash,
+        error instanceof Error ? error.message : "Unable to provision monday.com board.",
+      );
+      throw error;
+    }
   });
 
 export const submitForReview = createServerFn({ method: "POST" })

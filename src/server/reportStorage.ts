@@ -120,6 +120,18 @@ CREATE TABLE IF NOT EXISTS finalized_pdf_metadata (
   created_at TEXT NOT NULL,
   FOREIGN KEY (report_id) REFERENCES voting_reports(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS monday_provisioning_keys (
+  key_hash TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  board_id TEXT NOT NULL DEFAULT '',
+  board_url TEXT NOT NULL DEFAULT '',
+  result_json TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '',
+  consumed_at TEXT NOT NULL,
+  completed_at TEXT NOT NULL DEFAULT '',
+  failed_at TEXT NOT NULL DEFAULT ''
+);
 `;
 
 type ReportRow = {
@@ -205,6 +217,19 @@ type EventInsert = Omit<WorkflowEvent, "id" | "createdAt"> & {
 };
 
 const memoryReports = new Map<string, StoredVotingReport>();
+const memoryMondayProvisioningKeys = new Map<
+  string,
+  {
+    status: "pending" | "completed" | "failed";
+    boardId: string;
+    boardUrl: string;
+    resultJson: string;
+    error: string;
+    consumedAt: string;
+    completedAt: string;
+    failedAt: string;
+  }
+>();
 const memoryTokens = new Map<
   string,
   {
@@ -509,6 +534,108 @@ export async function upsertReport(input: ReportUpsertInput) {
   }
 
   return (await getD1Report(db, storedReport.id)) ?? storedReport;
+}
+
+export async function consumeMondayProvisioningKey(keyHash: string) {
+  const consumedAt = nowIso();
+  const db = getD1();
+
+  if (!db) {
+    if (memoryMondayProvisioningKeys.has(keyHash)) {
+      throw new Error("This monday.com provisioning key has already been used.");
+    }
+
+    memoryMondayProvisioningKeys.set(keyHash, {
+      status: "pending",
+      boardId: "",
+      boardUrl: "",
+      resultJson: "",
+      error: "",
+      consumedAt,
+      completedAt: "",
+      failedAt: "",
+    });
+    return;
+  }
+
+  await ensureSchema(db);
+  const result = await db
+    .prepare(
+      `INSERT OR IGNORE INTO monday_provisioning_keys
+        (key_hash, status, consumed_at)
+      VALUES (?, ?, ?)`,
+    )
+    .bind(keyHash, "pending", consumedAt)
+    .run();
+
+  if (result.meta.changes === 0) {
+    throw new Error("This monday.com provisioning key has already been used.");
+  }
+}
+
+export async function completeMondayProvisioningKey(
+  keyHash: string,
+  result: { boardId: string; boardUrl: string; resultJson: string },
+) {
+  const completedAt = nowIso();
+  const db = getD1();
+
+  if (!db) {
+    const keyRecord = memoryMondayProvisioningKeys.get(keyHash);
+    if (!keyRecord) {
+      return;
+    }
+
+    memoryMondayProvisioningKeys.set(keyHash, {
+      ...keyRecord,
+      status: "completed",
+      boardId: result.boardId,
+      boardUrl: result.boardUrl,
+      resultJson: result.resultJson,
+      completedAt,
+    });
+    return;
+  }
+
+  await ensureSchema(db);
+  await db
+    .prepare(
+      `UPDATE monday_provisioning_keys
+      SET status = ?, board_id = ?, board_url = ?, result_json = ?, completed_at = ?
+      WHERE key_hash = ?`,
+    )
+    .bind("completed", result.boardId, result.boardUrl, result.resultJson, completedAt, keyHash)
+    .run();
+}
+
+export async function failMondayProvisioningKey(keyHash: string, error: string) {
+  const failedAt = nowIso();
+  const db = getD1();
+
+  if (!db) {
+    const keyRecord = memoryMondayProvisioningKeys.get(keyHash);
+    if (!keyRecord) {
+      return;
+    }
+
+    memoryMondayProvisioningKeys.set(keyHash, {
+      ...keyRecord,
+      status: "failed",
+      error,
+      failedAt,
+    });
+    return;
+  }
+
+  await ensureSchema(db);
+  await db
+    .prepare(
+      `UPDATE monday_provisioning_keys
+      SET status = ?, error = ?, failed_at = ?
+      WHERE key_hash = ?`,
+    )
+    .bind("failed", error, failedAt, keyHash)
+    .run();
 }
 
 export async function getReport(reportId: string) {

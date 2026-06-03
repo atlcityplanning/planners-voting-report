@@ -14,6 +14,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReviewTokenRouteImport } from './routes/review.$token'
 import { Route as DashboardReportIdRouteImport } from './routes/dashboard.$reportId'
 import { Route as AuthorizeTokenRouteImport } from './routes/authorize.$token'
+import { Route as AdminMondayProvisionRouteImport } from './routes/admin.monday-provision'
 import { Route as ReportsReportIdPrintRouteImport } from './routes/reports.$reportId.print'
 
 const AboutRoute = AboutRouteImport.update({
@@ -41,6 +42,11 @@ const AuthorizeTokenRoute = AuthorizeTokenRouteImport.update({
   path: '/authorize/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminMondayProvisionRoute = AdminMondayProvisionRouteImport.update({
+  id: '/admin/monday-provision',
+  path: '/admin/monday-provision',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportsReportIdPrintRoute = ReportsReportIdPrintRouteImport.update({
   id: '/reports/$reportId/print',
   path: '/reports/$reportId/print',
@@ -50,6 +56,7 @@ const ReportsReportIdPrintRoute = ReportsReportIdPrintRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/admin/monday-provision': typeof AdminMondayProvisionRoute
   '/authorize/$token': typeof AuthorizeTokenRoute
   '/dashboard/$reportId': typeof DashboardReportIdRoute
   '/review/$token': typeof ReviewTokenRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/admin/monday-provision': typeof AdminMondayProvisionRoute
   '/authorize/$token': typeof AuthorizeTokenRoute
   '/dashboard/$reportId': typeof DashboardReportIdRoute
   '/review/$token': typeof ReviewTokenRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/admin/monday-provision': typeof AdminMondayProvisionRoute
   '/authorize/$token': typeof AuthorizeTokenRoute
   '/dashboard/$reportId': typeof DashboardReportIdRoute
   '/review/$token': typeof ReviewTokenRoute
@@ -77,6 +86,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/admin/monday-provision'
     | '/authorize/$token'
     | '/dashboard/$reportId'
     | '/review/$token'
@@ -85,6 +95,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/admin/monday-provision'
     | '/authorize/$token'
     | '/dashboard/$reportId'
     | '/review/$token'
@@ -93,6 +104,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
+    | '/admin/monday-provision'
     | '/authorize/$token'
     | '/dashboard/$reportId'
     | '/review/$token'
@@ -102,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  AdminMondayProvisionRoute: typeof AdminMondayProvisionRoute
   AuthorizeTokenRoute: typeof AuthorizeTokenRoute
   DashboardReportIdRoute: typeof DashboardReportIdRoute
   ReviewTokenRoute: typeof ReviewTokenRoute
@@ -145,6 +158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthorizeTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/monday-provision': {
+      id: '/admin/monday-provision'
+      path: '/admin/monday-provision'
+      fullPath: '/admin/monday-provision'
+      preLoaderRoute: typeof AdminMondayProvisionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reports/$reportId/print': {
       id: '/reports/$reportId/print'
       path: '/reports/$reportId/print'
@@ -158,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  AdminMondayProvisionRoute: AdminMondayProvisionRoute,
   AuthorizeTokenRoute: AuthorizeTokenRoute,
   DashboardReportIdRoute: DashboardReportIdRoute,
   ReviewTokenRoute: ReviewTokenRoute,
