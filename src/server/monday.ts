@@ -453,5 +453,61 @@ export async function pushReportToMonday(
       console.error("Failed to upload PDF to Monday item:", err);
     }
   }
+
+  return itemId;
+}
+
+export async function updateMondayItemStatus(
+  boardConfig: MondayVotingReportBoardConfig,
+  itemId: string,
+  statusLabel: "Submitted for Review" | "Changes Requested" | "Finalized"
+) {
+  const appEnv = getAppEnv();
+  const token = appEnv.MONDAY_API_TOKEN;
+  if (!token) return;
+
+  const clientOptions = {
+    token,
+    apiVersion: appEnv.MONDAY_API_VERSION || DEFAULT_MONDAY_API_VERSION,
+  };
+
+  const query = `mutation ChangeStatus($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
+    change_column_value(
+      board_id: $boardId,
+      item_id: $itemId,
+      column_id: $columnId,
+      value: $value
+    ) {
+      id
+    }
+  }`;
+
+  await mondayQuery(clientOptions, query, {
+    boardId: boardConfig.board.id,
+    itemId,
+    columnId: boardConfig.columns.reportStatus.id,
+    value: JSON.stringify({ label: statusLabel }),
+  });
+
+  // Also move the item to the correct group if needed
+  let groupId: string | undefined;
+  if (statusLabel === "Submitted for Review") groupId = boardConfig.groups.submittedForReview.id;
+  if (statusLabel === "Changes Requested") groupId = boardConfig.groups.changesRequested.id;
+  if (statusLabel === "Finalized") groupId = boardConfig.groups.finalized.id;
+
+  if (groupId) {
+    const moveQuery = `mutation MoveItem($itemId: ID!, $groupId: String!) {
+      move_item_to_group(
+        item_id: $itemId,
+        group_id: $groupId
+      ) {
+        id
+      }
+    }`;
+    await mondayQuery(clientOptions, moveQuery, {
+      itemId,
+      groupId,
+    });
+  }
 }
 

@@ -73,6 +73,7 @@ export type StoredVotingReport = {
   chairSignatureToken: string | null;
   plannerSignatureToken: string | null;
   finalizedPdf: FinalizedPdfMetadata | null;
+  mondayItemId: string | null;
 };
 
 export type SubmissionRecipients = {

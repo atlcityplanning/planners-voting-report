@@ -5,6 +5,7 @@ import {
   createMondayVotingReportBoard,
   createMondayVotingReportBoardInputSchema,
   pushReportToMonday,
+  updateMondayItemStatus,
 } from "@/server/monday";
 import { getAppEnv, getNpuTeamSubmissionEmail } from "@/server/platform";
 import { sendSubmissionNotifications } from "@/server/reportEmail";
@@ -23,6 +24,7 @@ import {
   listReports,
   saveReportSignature,
   updateReportStatus,
+  updateReportMondayItemId,
   upsertReport,
 } from "@/server/reportStorage";
 import {
@@ -112,7 +114,10 @@ export const submitForReview = createServerFn({ method: "POST" })
 
     const boardConfig = await getActiveMondayBoardConfig();
     if (boardConfig) {
-      await pushReportToMonday(boardConfig, report, data.pdfBase64);
+      const itemId = await pushReportToMonday(boardConfig, report, data.pdfBase64);
+      if (itemId) {
+        await updateReportMondayItemId(report.id, itemId);
+      }
     }
 
     return (await getReport(report.id)) ?? report;
@@ -154,6 +159,15 @@ export const requestReportChanges = createServerFn({ method: "POST" })
       actorEmail: data.actorEmail,
       comments: data.comments || "Changes requested.",
     });
+
+    const boardConfig = await getActiveMondayBoardConfig();
+    if (boardConfig && report.mondayItemId) {
+      try {
+        await updateMondayItemStatus(boardConfig, report.mondayItemId, "Changes Requested");
+      } catch (err) {
+        console.error("Failed to update Monday status to Changes Requested:", err);
+      }
+    }
 
     return getReport(data.reportId);
   });
@@ -200,6 +214,15 @@ export const finalizeReport = createServerFn({ method: "POST" })
       actorEmail: "",
       comments: "Final report route marked as finalized PDF source.",
     });
+
+    const boardConfig = await getActiveMondayBoardConfig();
+    if (boardConfig && report.mondayItemId) {
+      try {
+        await updateMondayItemStatus(boardConfig, report.mondayItemId, "Finalized");
+      } catch (err) {
+        console.error("Failed to update Monday status to Finalized:", err);
+      }
+    }
 
     return getReport(data.reportId);
   });

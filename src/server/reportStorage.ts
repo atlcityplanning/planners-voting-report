@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS voting_reports (
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL,
   submitted_at TEXT NOT NULL DEFAULT '',
-  finalized_at TEXT NOT NULL DEFAULT ''
+  finalized_at TEXT NOT NULL DEFAULT '',
+  monday_item_id TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS voting_report_items (
@@ -155,6 +156,7 @@ type ReportRow = {
   updated_at: string;
   submitted_at: string;
   finalized_at: string;
+  monday_item_id: string;
 };
 
 type ItemRow = {
@@ -209,6 +211,7 @@ type ReportUpsertInput = {
   plannerEmail: string;
   npuTeamEmail: string;
   submittedAt?: string;
+  mondayItemId?: string;
 };
 
 type NotificationInsert = Omit<NotificationAttempt, "id" | "createdAt"> & {
@@ -238,7 +241,7 @@ const memoryTokens = new Map<
   {
     token: string;
     reportId: string;
-    purpose: "review";
+    purpose: "review" | "chair_signature" | "planner_signature";
     recipientEmail: string;
     expiresAt: string;
     createdAt: string;
@@ -314,7 +317,10 @@ function createBlankStoredReport(
     notificationAttempts: existing?.notificationAttempts ?? [],
     workflowEvents: existing?.workflowEvents ?? [],
     signatures: existing?.signatures ?? createEmptySignatures(),
+    chairSignatureToken: existing?.chairSignatureToken ?? null,
+    plannerSignatureToken: existing?.plannerSignatureToken ?? null,
     finalizedPdf: existing?.finalizedPdf ?? null,
+    mondayItemId: input.mondayItemId ?? existing?.mondayItemId ?? null,
   };
 }
 
@@ -467,6 +473,8 @@ async function hydrateD1Report(db: D1Database, row: ReportRow): Promise<StoredVo
       createdAt: event.created_at,
     })),
     signatures,
+    chairSignatureToken: null,
+    plannerSignatureToken: null,
     finalizedPdf: finalizedPdfRow
       ? {
           id: finalizedPdfRow.id,
@@ -476,6 +484,7 @@ async function hydrateD1Report(db: D1Database, row: ReportRow): Promise<StoredVo
           createdAt: finalizedPdfRow.created_at,
         }
       : null,
+    mondayItemId: row.monday_item_id || null,
   };
 }
 
@@ -486,7 +495,7 @@ async function getD1Report(db: D1Database, reportId: string) {
       `SELECT id, status, npu, chair, location, planner, meeting_date, autofill,
         planner_notes, chair_email, planner_email, npu_team_email,
         contact_source_version, revision, created_at, updated_at, submitted_at,
-        finalized_at
+        finalized_at, monday_item_id
       FROM voting_reports
       WHERE id = ?`,
     )
@@ -512,14 +521,36 @@ export async function upsertReport(input: ReportUpsertInput) {
   }
 
   await ensureSchema(db);
+  const reportValues = [
+    storedReport.id,
+    storedReport.status,
+    storedReport.report.npu,
+    storedReport.report.chair,
+    storedReport.report.location,
+    storedReport.report.planner,
+    storedReport.report.meetingDate,
+    storedReport.report.autofill ? 1 : 0,
+    storedReport.report.plannerNotes,
+    storedReport.chairEmail,
+    storedReport.plannerEmail,
+    storedReport.npuTeamEmail,
+    storedReport.contactSourceVersion,
+    storedReport.revision,
+    storedReport.createdAt,
+    storedReport.updatedAt,
+    storedReport.submittedAt,
+    storedReport.finalizedAt,
+    storedReport.mondayItemId || "",
+  ];
+
   await db
     .prepare(
       `INSERT INTO voting_reports (
         id, status, npu, chair, location, planner, meeting_date, autofill,
         planner_notes, chair_email, planner_email, npu_team_email,
         contact_source_version, revision, created_at, updated_at, submitted_at,
-        finalized_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        finalized_at, monday_item_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         status = excluded.status,
         npu = excluded.npu,
@@ -536,28 +567,10 @@ export async function upsertReport(input: ReportUpsertInput) {
         revision = excluded.revision,
         updated_at = excluded.updated_at,
         submitted_at = excluded.submitted_at,
-        finalized_at = excluded.finalized_at`,
+        finalized_at = excluded.finalized_at,
+        monday_item_id = excluded.monday_item_id`,
     )
-    .bind(
-      storedReport.id,
-      storedReport.status,
-      storedReport.report.npu,
-      storedReport.report.chair,
-      storedReport.report.location,
-      storedReport.report.planner,
-      storedReport.report.meetingDate,
-      storedReport.report.autofill ? 1 : 0,
-      storedReport.report.plannerNotes,
-      storedReport.chairEmail,
-      storedReport.plannerEmail,
-      storedReport.npuTeamEmail,
-      storedReport.contactSourceVersion,
-      storedReport.revision,
-      storedReport.createdAt,
-      storedReport.updatedAt,
-      storedReport.submittedAt,
-      storedReport.finalizedAt,
-    )
+    .bind(...reportValues)
     .run();
 
   await db.prepare("DELETE FROM voting_report_items WHERE report_id = ?").bind(storedReport.id).run();
@@ -571,7 +584,7 @@ export async function upsertReport(input: ReportUpsertInput) {
             VALUES (?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
-            item.id,
+            createId(),
             storedReport.id,
             position,
             item.itemType,
@@ -838,6 +851,28 @@ export async function updateReportStatus(
   return getD1Report(db, reportId);
 }
 
+export async function updateReportMondayItemId(reportId: string, mondayItemId: string) {
+  const db = getD1();
+  const timestamp = nowIso();
+
+  if (!db) {
+    const report = memoryReports.get(reportId);
+    if (!report) return null;
+
+    const nextReport = { ...report, mondayItemId, updatedAt: timestamp };
+    memoryReports.set(reportId, nextReport);
+    return nextReport;
+  }
+
+  await ensureSchema(db);
+  await db
+    .prepare("UPDATE voting_reports SET monday_item_id = ?, updated_at = ? WHERE id = ?")
+    .bind(mondayItemId, timestamp, reportId)
+    .run();
+
+  return getD1Report(db, reportId);
+}
+
 export async function saveReportSignature(
   reportId: string,
   input: Pick<ReportSignature, "role" | "signerName" | "signedDate">,
@@ -953,7 +988,7 @@ export async function createReportRevision(reportId: string, reason: string) {
 
 export async function createReviewToken(
   reportId: string,
-  purpose: "review",
+  purpose: "review" | "chair_signature" | "planner_signature",
   recipientEmail: string,
 ) {
   const token = createId();

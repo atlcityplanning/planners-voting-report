@@ -452,7 +452,7 @@ export default function ReportDashboard({ reportId }: ReportDashboardProps) {
             }
           >
             <Mail aria-hidden="true" size={18} />
-            Resend
+            Resend Links
           </button>
         </div>
       </header>
