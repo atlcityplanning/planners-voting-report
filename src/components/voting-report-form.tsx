@@ -621,7 +621,7 @@ export default function VotingReportForm() {
     <main className="mx-auto w-[min(1180px,calc(100%-2rem))] py-8 print:w-full print:py-0">
       <dialog
         ref={dialogRef}
-        className="w-[min(26rem,calc(100%-2rem))] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-foreground/40"
+        className="m-auto w-[min(26rem,calc(100%-2rem))] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-foreground/40"
       >
         <p className="m-0 mb-4 text-sm text-muted-foreground">{dialogMessage}</p>
         <button
@@ -635,7 +635,7 @@ export default function VotingReportForm() {
 
       <dialog
         ref={submissionDialogRef}
-        className="w-[min(36rem,calc(100%-2rem))] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-foreground/40"
+        className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-foreground/40"
       >
         <div className="mb-5">
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
@@ -664,14 +664,9 @@ export default function VotingReportForm() {
           <label className="grid gap-1">
             <span className={labelClass}>NPU Team Email</span>
             <input
-              className={screenFieldClass}
+              className={cn(screenFieldClass, "read-only:opacity-60 read-only:cursor-not-allowed")}
               value={submissionRecipients.npuTeamEmail}
-              onChange={(event) =>
-                setSubmissionRecipients((currentRecipients) => ({
-                  ...currentRecipients,
-                  npuTeamEmail: event.target.value,
-                }))
-              }
+              readOnly
               type="email"
               required
             />
