@@ -1,1 +1,1 @@
-ALTER TABLE voting_reports ADD COLUMN monday_item_id TEXT;
+ALTER TABLE voting_reports ADD COLUMN monday_item_id TEXT NOT NULL DEFAULT '';

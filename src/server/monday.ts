@@ -25,8 +25,12 @@ const MONDAY_BOARD_COLUMNS = [
   { key: "agendaItemCount", title: "Agenda Items", type: "numbers" },
   { key: "reportLink", title: "Report Link", type: "link" },
   { key: "pdfLink", title: "PDF Link", type: "link" },
-  { key: "generatedPdf", title: "Generated PDF", type: "file" },
+  { key: "people", title: "People", type: "people" },
   { key: "plannerNotes", title: "Planner Notes", type: "long_text" },
+] as const;
+
+const RETIRED_MONDAY_BOARD_COLUMNS = [
+  { title: "Generated PDF", type: "file" },
 ] as const;
 
 const MONDAY_STATUS_LABELS = [
@@ -52,7 +56,7 @@ export const createMondayVotingReportBoardInputSchema = z.object({
     .trim()
     .max(1000)
     .optional()
-    .default("Tracks NPU voting report submissions, review status, and finalized PDFs."),
+    .default("Tracks NPU voting report submissions, review status, and print links."),
   boardKind: boardKindSchema.optional().default("private"),
   workspaceId: numericIdSchema.optional(),
 });
@@ -63,6 +67,7 @@ type CreateMondayVotingReportBoardInput = z.infer<
 type MondayBoardKind = z.infer<typeof boardKindSchema>;
 type MondayBoardGroupKey = (typeof MONDAY_BOARD_GROUPS)[number]["key"];
 type MondayBoardColumnKey = "reportStatus" | (typeof MONDAY_BOARD_COLUMNS)[number]["key"];
+type MondayReportStatusLabel = "Submitted for Review" | "Changes Requested" | "Finalized";
 
 type MondayBoard = {
   id: string;
@@ -82,6 +87,11 @@ type MondayColumn = {
   type: string;
 };
 
+type MondayPerson = {
+  id: string;
+  name?: string;
+};
+
 type MondayGraphqlError = {
   message?: string;
 };
@@ -97,6 +107,7 @@ export type MondayVotingReportBoardConfig = {
   board: MondayBoard;
   groups: Record<MondayBoardGroupKey, MondayGroup>;
   columns: Record<MondayBoardColumnKey, MondayColumn>;
+  boardPeople: Array<MondayPerson>;
 };
 
 type MondayClientOptions = {
@@ -180,6 +191,166 @@ function getCreateColumnQuery(boardId: string, columnType: string) {
       type
     }
   }`;
+}
+
+function getDeleteColumnQuery(boardId: string) {
+  return `mutation DeleteNpuVotingReportColumn($columnId: String!) {
+    delete_column(
+      board_id: ${assertNumericId(boardId, "boardId")}
+      column_id: $columnId
+    ) {
+      id
+    }
+  }`;
+}
+
+function getMondayStatusLabel(status: StoredVotingReport["status"]): MondayReportStatusLabel {
+  if (status === "changes_requested") {
+    return "Changes Requested";
+  }
+
+  if (status === "finalized") {
+    return "Finalized";
+  }
+
+  return "Submitted for Review";
+}
+
+function getMondayGroupId(
+  boardConfig: MondayVotingReportBoardConfig,
+  statusLabel: MondayReportStatusLabel,
+) {
+  if (statusLabel === "Changes Requested") {
+    return boardConfig.groups.changesRequested.id;
+  }
+
+  if (statusLabel === "Finalized") {
+    return boardConfig.groups.finalized.id;
+  }
+
+  return boardConfig.groups.submittedForReview.id;
+}
+
+function formatDateColumnValue(isoOrDate: string) {
+  return { date: isoOrDate.split("T")[0] };
+}
+
+function getMondayItemName(report: StoredVotingReport) {
+  return `Report: NPU ${report.report.npu} - ${report.report.meetingDate || "Pending"}`;
+}
+
+function getRequiredBoardGroup(
+  groups: Array<MondayGroup>,
+  group: (typeof MONDAY_BOARD_GROUPS)[number],
+) {
+  const matchedGroup = groups.find((candidate) => candidate.title === group.title);
+  if (!matchedGroup) {
+    throw new Error(`monday.com board is missing required group "${group.title}".`);
+  }
+
+  return matchedGroup;
+}
+
+function findBoardColumn(
+  columns: Array<MondayColumn>,
+  title: string,
+  type?: string,
+) {
+  return columns.find(
+    (candidate) => candidate.title === title && (!type || candidate.type === type),
+  );
+}
+
+function getRequiredBoardColumn(
+  columns: Array<MondayColumn>,
+  title: string,
+  type?: string,
+) {
+  const matchedColumn = findBoardColumn(columns, title, type);
+  if (!matchedColumn) {
+    throw new Error(`monday.com board is missing required column "${title}".`);
+  }
+
+  return matchedColumn;
+}
+
+function getPeopleColumnValue(people: Array<MondayPerson>) {
+  const personsAndTeams = people
+    .filter((person) => /^\d+$/.test(person.id))
+    .map((person) => ({ id: Number(person.id), kind: "person" }));
+
+  return personsAndTeams.length ? { personsAndTeams } : {};
+}
+
+function normalizeMondayPeople(people?: Array<MondayPerson> | null) {
+  const seen = new Set<string>();
+  const normalizedPeople: Array<MondayPerson> = [];
+
+  for (const person of people ?? []) {
+    if (!person.id || seen.has(person.id)) {
+      continue;
+    }
+
+    seen.add(person.id);
+    normalizedPeople.push(person);
+  }
+
+  return normalizedPeople;
+}
+
+function getReportColumnValues(
+  boardConfig: MondayVotingReportBoardConfig,
+  report: StoredVotingReport,
+) {
+  const appUrl = getPublicAppUrl();
+  const statusLabel = getMondayStatusLabel(report.status);
+  const printUrl = `${appUrl}/reports/${report.id}/print`;
+  const columnValues: Record<string, unknown> = {
+    [boardConfig.columns.npu.id]: report.report.npu,
+    [boardConfig.columns.meetingDate.id]: formatDateColumnValue(
+      report.report.meetingDate || new Date().toISOString(),
+    ),
+    [boardConfig.columns.planner.id]: report.report.planner,
+    [boardConfig.columns.chair.id]: report.report.chair,
+    [boardConfig.columns.plannerEmail.id]: report.plannerEmail
+      ? {
+          email: report.plannerEmail,
+          text: report.plannerEmail,
+        }
+      : {},
+    [boardConfig.columns.chairEmail.id]: report.chairEmail
+      ? {
+          email: report.chairEmail,
+          text: report.chairEmail,
+        }
+      : {},
+    [boardConfig.columns.npuTeamEmail.id]: report.npuTeamEmail
+      ? {
+          email: report.npuTeamEmail,
+          text: report.npuTeamEmail,
+        }
+      : {},
+    [boardConfig.columns.submittedAt.id]: formatDateColumnValue(
+      report.submittedAt || report.createdAt,
+    ),
+    [boardConfig.columns.finalizedAt.id]: report.finalizedAt
+      ? formatDateColumnValue(report.finalizedAt)
+      : {},
+    [boardConfig.columns.agendaItemCount.id]: String(report.report.items.length),
+    [boardConfig.columns.reportLink.id]: {
+      url: `${appUrl}/dashboard/${report.id}`,
+      text: "View Dashboard",
+    },
+    [boardConfig.columns.pdfLink.id]: {
+      url: printUrl,
+      text: "Print / Download PDF",
+    },
+    [boardConfig.columns.people.id]: getPeopleColumnValue(boardConfig.boardPeople),
+    [boardConfig.columns.reportStatus.id]: { label: statusLabel },
+    [boardConfig.columns.plannerNotes.id]: { text: report.report.plannerNotes },
+  };
+
+  return { columnValues, statusLabel };
 }
 
 async function mondayQuery<TData>(
@@ -284,6 +455,113 @@ async function createMondayColumn(
   return data.create_column;
 }
 
+async function getOrCreateMondayColumn(
+  clientOptions: MondayClientOptions,
+  boardId: string,
+  existingColumns: Array<MondayColumn>,
+  column: (typeof MONDAY_BOARD_COLUMNS)[number],
+) {
+  const existingColumn = findBoardColumn(existingColumns, column.title, column.type);
+  if (existingColumn) {
+    return existingColumn;
+  }
+
+  const createdColumn = await createMondayColumn(clientOptions, boardId, column);
+  existingColumns.push(createdColumn);
+  return createdColumn;
+}
+
+async function deleteMondayColumn(
+  clientOptions: MondayClientOptions,
+  boardId: string,
+  columnId: string,
+) {
+  await mondayQuery<{ delete_column: { id: string } }>(
+    clientOptions,
+    getDeleteColumnQuery(boardId),
+    { columnId },
+  );
+}
+
+async function deleteRetiredMondayColumns(
+  clientOptions: MondayClientOptions,
+  boardId: string,
+  columns: Array<MondayColumn>,
+) {
+  for (const retiredColumn of RETIRED_MONDAY_BOARD_COLUMNS) {
+    const matchedColumn = findBoardColumn(columns, retiredColumn.title, retiredColumn.type);
+    if (!matchedColumn) {
+      continue;
+    }
+
+    try {
+      await deleteMondayColumn(clientOptions, boardId, matchedColumn.id);
+    } catch (error) {
+      console.warn(`Unable to delete retired monday.com column "${retiredColumn.title}":`, error);
+    }
+  }
+}
+
+async function getMondayBoardPeople(clientOptions: MondayClientOptions, boardId: string) {
+  const query = `query GetNpuVotingReportBoardOwners($boardId: ID!) {
+    boards(ids: [$boardId]) {
+      owners {
+        id
+        name
+      }
+    }
+  }`;
+
+  try {
+    const data = await mondayQuery<{
+      boards: Array<{ owners?: Array<MondayPerson> }>;
+    }>(clientOptions, query, {
+      boardId: assertNumericId(boardId, "boardId"),
+    });
+
+    return normalizeMondayPeople(data.boards[0]?.owners);
+  } catch (error) {
+    console.warn("Unable to read monday.com board owners for People column:", error);
+    return [];
+  }
+}
+
+async function getMondayBoardSubscribers(clientOptions: MondayClientOptions, boardId: string) {
+  const query = `query GetNpuVotingReportBoardSubscribers($boardId: ID!) {
+    boards(ids: [$boardId]) {
+      subscribers {
+        id
+        name
+      }
+    }
+  }`;
+
+  try {
+    const data = await mondayQuery<{
+      boards: Array<{ subscribers?: Array<MondayPerson> }>;
+    }>(clientOptions, query, {
+      boardId: assertNumericId(boardId, "boardId"),
+    });
+
+    return normalizeMondayPeople(data.boards[0]?.subscribers);
+  } catch (error) {
+    console.warn("Unable to read monday.com board subscribers for People column:", error);
+    return [];
+  }
+}
+
+async function getMondayBoardPeopleWithAccess(
+  clientOptions: MondayClientOptions,
+  boardId: string,
+  owners?: Array<MondayPerson>,
+) {
+  const boardOwners = owners
+    ? normalizeMondayPeople(owners)
+    : await getMondayBoardPeople(clientOptions, boardId);
+  const subscribers = await getMondayBoardSubscribers(clientOptions, boardId);
+  return normalizeMondayPeople([...boardOwners, ...subscribers]);
+}
+
 export async function createMondayVotingReportBoard(
   input: CreateMondayVotingReportBoardInput,
 ): Promise<MondayVotingReportBoardConfig> {
@@ -313,10 +591,95 @@ export async function createMondayVotingReportBoard(
     columns[column.key] = await createMondayColumn(clientOptions, board.id, column);
   }
 
+  const boardPeople = await getMondayBoardPeopleWithAccess(clientOptions, board.id);
+
   return {
     board,
     groups,
     columns,
+    boardPeople,
+  };
+}
+
+export async function getMondayVotingReportBoardConfig(
+  boardId: string,
+): Promise<MondayVotingReportBoardConfig | null> {
+  const appEnv = getAppEnv();
+  const token = appEnv.MONDAY_API_TOKEN;
+  if (!token) {
+    console.warn("MONDAY_API_TOKEN is not configured, skipping monday board lookup.");
+    return null;
+  }
+
+  const clientOptions = {
+    token,
+    apiVersion: appEnv.MONDAY_API_VERSION || DEFAULT_MONDAY_API_VERSION,
+  };
+  const query = `query GetNpuVotingReportBoard($boardId: ID!) {
+    boards(ids: [$boardId]) {
+      id
+      name
+      url
+      groups {
+        id
+        title
+        color
+      }
+      columns {
+        id
+        title
+        type
+      }
+      owners {
+        id
+        name
+      }
+    }
+  }`;
+  const data = await mondayQuery<{
+    boards: Array<
+      MondayBoard & {
+        groups: Array<MondayGroup>;
+        columns: Array<MondayColumn>;
+        owners?: Array<MondayPerson>;
+      }
+    >;
+  }>(clientOptions, query, {
+    boardId: assertNumericId(boardId, "MONDAY_BOARD_ID"),
+  });
+  const board = data.boards[0];
+  if (!board) {
+    throw new Error(`monday.com board ${boardId} was not found.`);
+  }
+
+  const groups = {} as Record<MondayBoardGroupKey, MondayGroup>;
+  for (const group of MONDAY_BOARD_GROUPS) {
+    groups[group.key] = getRequiredBoardGroup(board.groups, group);
+  }
+
+  await deleteRetiredMondayColumns(clientOptions, board.id, board.columns);
+
+  const columns = {
+    reportStatus: getRequiredBoardColumn(board.columns, "Report Status", "status"),
+  } as Record<MondayBoardColumnKey, MondayColumn>;
+  for (const column of MONDAY_BOARD_COLUMNS) {
+    columns[column.key] = await getOrCreateMondayColumn(
+      clientOptions,
+      board.id,
+      board.columns,
+      column,
+    );
+  }
+
+  return {
+    board: {
+      id: board.id,
+      name: board.name,
+      url: board.url,
+    },
+    groups,
+    columns,
+    boardPeople: await getMondayBoardPeopleWithAccess(clientOptions, board.id, board.owners),
   };
 }
 
@@ -348,50 +711,58 @@ export async function createMondayItem(
   return data.create_item.id;
 }
 
-export async function uploadFileToMondayItem(
+export async function updateMondayItemColumns(
+  clientOptions: MondayClientOptions,
+  boardId: string,
+  itemId: string,
+  columnValues: Record<string, unknown>,
+) {
+  const query = `mutation UpdateItemColumns($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
+    change_multiple_column_values(
+      board_id: $boardId
+      item_id: $itemId
+      column_values: $columnValues
+    ) {
+      id
+    }
+  }`;
+
+  const data = await mondayQuery<{ change_multiple_column_values: { id: string } }>(
+    clientOptions,
+    query,
+    {
+      boardId,
+      itemId,
+      columnValues: JSON.stringify(columnValues),
+    },
+  );
+
+  return data.change_multiple_column_values.id;
+}
+
+async function moveMondayItemToGroup(
   clientOptions: MondayClientOptions,
   itemId: string,
-  columnId: string,
-  pdfBase64: string,
+  groupId: string,
 ) {
-  const binaryString = atob(pdfBase64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  const blob = new Blob([bytes], { type: "application/pdf" });
+  const query = `mutation MoveItem($itemId: ID!, $groupId: String!) {
+    move_item_to_group(
+      item_id: $itemId,
+      group_id: $groupId
+    ) {
+      id
+    }
+  }`;
 
-  const query = `mutation add_file($file: File!) { add_file_to_column (item_id: ${itemId}, column_id: "${columnId}", file: $file) { id } }`;
-  
-  const formData = new FormData();
-  formData.append("query", query);
-  formData.append("variables[file]", blob, "voting-report.pdf");
-
-  const response = await fetch("https://api.monday.com/v2/file", {
-    method: "POST",
-    headers: {
-      Authorization: clientOptions.token,
-      "API-Version": clientOptions.apiVersion,
-    },
-    body: formData,
+  await mondayQuery(clientOptions, query, {
+    itemId,
+    groupId,
   });
-
-  if (!response.ok) {
-    throw new Error(`monday.com API file upload failed with status ${response.status}.`);
-  }
-
-  const body = await response.json().catch(() => null) as MondayGraphqlResponse<{ add_file_to_column: { id: string } }> | null;
-  
-  if (body?.errors?.length) {
-    const message = body.errors.map((error) => error.message).filter(Boolean).join(" ");
-    throw new Error(message || "monday.com API returned a GraphQL error on file upload.");
-  }
 }
 
 export async function pushReportToMonday(
   boardConfig: MondayVotingReportBoardConfig,
   report: StoredVotingReport,
-  pdfBase64?: string,
 ) {
   const appEnv = getAppEnv();
   const token = appEnv.MONDAY_API_TOKEN;
@@ -405,109 +776,28 @@ export async function pushReportToMonday(
     apiVersion: appEnv.MONDAY_API_VERSION || DEFAULT_MONDAY_API_VERSION,
   };
 
-  const appUrl = getPublicAppUrl();
+  const { columnValues, statusLabel } = getReportColumnValues(boardConfig, report);
+  const groupId = getMondayGroupId(boardConfig, statusLabel);
+  const existingItemId = report.mondayItemId;
 
-  const columnValues: Record<string, unknown> = {
-    [boardConfig.columns.npu.id]: report.report.npu,
-    [boardConfig.columns.meetingDate.id]: { date: report.report.meetingDate || new Date().toISOString().split("T")[0] },
-    [boardConfig.columns.planner.id]: report.report.planner,
-    [boardConfig.columns.chair.id]: report.report.chair,
-  };
-  
-  if (report.plannerEmail) {
-    columnValues[boardConfig.columns.plannerEmail.id] = { email: report.plannerEmail, text: report.plannerEmail };
-  }
-  if (report.chairEmail) {
-    columnValues[boardConfig.columns.chairEmail.id] = { email: report.chairEmail, text: report.chairEmail };
-  }
-  if (report.npuTeamEmail) {
-    columnValues[boardConfig.columns.npuTeamEmail.id] = { email: report.npuTeamEmail, text: report.npuTeamEmail };
-  }
-
-  columnValues[boardConfig.columns.submittedAt.id] = { date: (report.submittedAt || report.createdAt).split("T")[0] };
-  columnValues[boardConfig.columns.agendaItemCount.id] = report.report.items.length;
-  columnValues[boardConfig.columns.reportLink.id] = { url: `${appUrl}/dashboard/${report.id}`, text: "View Dashboard" };
-  columnValues[boardConfig.columns.reportStatus.id] = { label: "Submitted for Review" };
-  
-  if (report.report.plannerNotes) {
-    columnValues[boardConfig.columns.plannerNotes.id] = report.report.plannerNotes;
-  }
-
-  const itemId = await createMondayItem(
-    clientOptions,
-    boardConfig.board.id,
-    boardConfig.groups.submittedForReview.id,
-    `Report: NPU ${report.report.npu} - ${report.report.meetingDate || "Pending"}`,
-    columnValues,
-  );
-
-  if (pdfBase64) {
-    try {
-      await uploadFileToMondayItem(
+  const itemId = existingItemId
+    ? await updateMondayItemColumns(
         clientOptions,
-        itemId,
-        boardConfig.columns.generatedPdf.id,
-        pdfBase64
+        boardConfig.board.id,
+        existingItemId,
+        columnValues,
+      )
+    : await createMondayItem(
+        clientOptions,
+        boardConfig.board.id,
+        groupId,
+        getMondayItemName(report),
+        columnValues,
       );
-    } catch (err) {
-      console.error("Failed to upload PDF to Monday item:", err);
-    }
+
+  if (existingItemId) {
+    await moveMondayItemToGroup(clientOptions, itemId, groupId);
   }
 
   return itemId;
 }
-
-export async function updateMondayItemStatus(
-  boardConfig: MondayVotingReportBoardConfig,
-  itemId: string,
-  statusLabel: "Submitted for Review" | "Changes Requested" | "Finalized"
-) {
-  const appEnv = getAppEnv();
-  const token = appEnv.MONDAY_API_TOKEN;
-  if (!token) return;
-
-  const clientOptions = {
-    token,
-    apiVersion: appEnv.MONDAY_API_VERSION || DEFAULT_MONDAY_API_VERSION,
-  };
-
-  const query = `mutation ChangeStatus($boardId: ID!, $itemId: ID!, $columnId: String!, $value: JSON!) {
-    change_column_value(
-      board_id: $boardId,
-      item_id: $itemId,
-      column_id: $columnId,
-      value: $value
-    ) {
-      id
-    }
-  }`;
-
-  await mondayQuery(clientOptions, query, {
-    boardId: boardConfig.board.id,
-    itemId,
-    columnId: boardConfig.columns.reportStatus.id,
-    value: JSON.stringify({ label: statusLabel }),
-  });
-
-  // Also move the item to the correct group if needed
-  let groupId: string | undefined;
-  if (statusLabel === "Submitted for Review") groupId = boardConfig.groups.submittedForReview.id;
-  if (statusLabel === "Changes Requested") groupId = boardConfig.groups.changesRequested.id;
-  if (statusLabel === "Finalized") groupId = boardConfig.groups.finalized.id;
-
-  if (groupId) {
-    const moveQuery = `mutation MoveItem($itemId: ID!, $groupId: String!) {
-      move_item_to_group(
-        item_id: $itemId,
-        group_id: $groupId
-      ) {
-        id
-      }
-    }`;
-    await mondayQuery(clientOptions, moveQuery, {
-      itemId,
-      groupId,
-    });
-  }
-}
-

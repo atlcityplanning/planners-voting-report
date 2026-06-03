@@ -157,7 +157,6 @@ export const submitForReviewInputSchema = z.object({
     plannerEmail: emailRecipientSchema.optional().default(""),
     npuTeamEmail: emailRecipientSchema,
   }),
-  pdfBase64: z.string().optional(),
 });
 
 export const reportIdInputSchema = z.object({

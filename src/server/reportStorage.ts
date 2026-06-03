@@ -249,6 +249,19 @@ const memoryTokens = new Map<
 >();
 const ensuredDbs = new WeakSet<D1Database>();
 
+async function ensureColumn(
+  db: D1Database,
+  tableName: string,
+  columnName: string,
+  addColumnSql: string,
+) {
+  const result = await db.prepare(`PRAGMA table_info(${tableName})`).all<{ name: string }>();
+  const columnExists = (result.results ?? []).some((column) => column.name === columnName);
+  if (!columnExists) {
+    await db.prepare(addColumnSql).run();
+  }
+}
+
 function createEmptySignatures(): Record<ReportSignatureRole, ReportSignature | null> {
   return {
     chair: null,
@@ -332,6 +345,13 @@ async function ensureSchema(db: D1Database) {
   for (const statement of SCHEMA_SQL.split(";").map((sql) => sql.trim()).filter(Boolean)) {
     await db.prepare(statement).run();
   }
+
+  await ensureColumn(
+    db,
+    "voting_reports",
+    "monday_item_id",
+    "ALTER TABLE voting_reports ADD COLUMN monday_item_id TEXT NOT NULL DEFAULT ''",
+  );
 
   await db
     .prepare(
@@ -722,7 +742,7 @@ export async function listReports() {
       `SELECT id, status, npu, chair, location, planner, meeting_date, autofill,
         planner_notes, chair_email, planner_email, npu_team_email,
         contact_source_version, revision, created_at, updated_at, submitted_at,
-        finalized_at
+        finalized_at, monday_item_id
       FROM voting_reports
       ORDER BY updated_at DESC`,
     )

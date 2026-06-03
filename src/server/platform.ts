@@ -9,6 +9,7 @@ type AppEnv = Cloudflare.Env & {
   PUBLIC_APP_URL?: string;
   MONDAY_API_TOKEN?: string;
   MONDAY_API_VERSION?: string;
+  MONDAY_BOARD_ID?: string;
   MONDAY_PROVISIONING_KEY?: string;
   MONDAY_WORKSPACE_ID?: string;
 };

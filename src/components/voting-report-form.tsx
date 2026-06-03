@@ -12,8 +12,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, FocusEvent, FormEvent, KeyboardEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import jsPDF from "jspdf";
-import { toCanvas } from "html-to-image";
 import {
   INITIAL_REPORT_STATE,
   ITEM_TYPES,
@@ -563,34 +561,6 @@ export default function VotingReportForm() {
   async function handleSubmitForReview(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmittingReport(true);
-    setSubmissionMessage("Generating PDF...");
-
-    let pdfBase64: string | undefined;
-    try {
-      const mainElement = document.querySelector("main");
-      if (mainElement) {
-        // Temporarily hide UI elements not meant for the PDF
-        const hiddenElements = Array.from(mainElement.querySelectorAll(".print\\:hidden")) as HTMLElement[];
-        hiddenElements.forEach(el => { el.style.display = 'none'; });
-
-        const canvas = await toCanvas(mainElement, { pixelRatio: 2 });
-        
-        hiddenElements.forEach(el => { el.style.display = ''; });
-
-        const pdf = new jsPDF({
-          orientation: "portrait",
-          unit: "px",
-          format: [canvas.width / 2, canvas.height / 2]
-        });
-        pdf.addImage(canvas.toDataURL("image/jpeg", 1.0), "JPEG", 0, 0, canvas.width / 2, canvas.height / 2);
-        
-        const dataUri = pdf.output("datauristring");
-        pdfBase64 = dataUri.split(",")[1];
-      }
-    } catch (err) {
-      console.warn("PDF generation failed:", err);
-    }
-
     setSubmissionMessage("Submitting report...");
 
     try {
@@ -599,7 +569,6 @@ export default function VotingReportForm() {
           reportId: submittedReportId || undefined,
           report,
           recipients: submissionRecipients,
-          pdfBase64,
         },
       });
 
@@ -613,7 +582,7 @@ export default function VotingReportForm() {
         form.setFieldValue(key, newReport[key]);
       });
       setSubmissionMessage("Submitted for review. Notification attempts were logged.");
-      
+
       submissionDialogRef.current?.close();
       navigate({ to: `/dashboard/${submittedReport.id}` });
     } catch (error) {
@@ -845,7 +814,7 @@ export default function VotingReportForm() {
               )}
             </form.Field>
           </label>
-          <label className="grid grid-cols-[1fr_auto] items-end gap-3 print:hidden">
+          <label className="grid grid-cols-[1fr_auto] items-center gap-3 print:hidden">
             <span className="self-center text-sm font-bold text-foreground">
               Autofill application numbers
             </span>

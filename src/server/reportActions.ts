@@ -4,8 +4,8 @@ import { getSubmissionRecipients as resolveSubmissionRecipients } from "@/server
 import {
   createMondayVotingReportBoard,
   createMondayVotingReportBoardInputSchema,
+  getMondayVotingReportBoardConfig,
   pushReportToMonday,
-  updateMondayItemStatus,
 } from "@/server/monday";
 import { getAppEnv, getNpuTeamSubmissionEmail } from "@/server/platform";
 import { sendSubmissionNotifications } from "@/server/reportEmail";
@@ -43,6 +43,41 @@ async function hashProvisioningKey(provisioningKey: string) {
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+async function getMondayBoardConfigForSync() {
+  const appEnv = getAppEnv();
+  const activeConfig = await getActiveMondayBoardConfig();
+  const boardId = activeConfig?.board?.id || appEnv.MONDAY_BOARD_ID;
+
+  if (!boardId) {
+    return activeConfig;
+  }
+
+  return (await getMondayVotingReportBoardConfig(boardId)) || activeConfig;
+}
+
+async function syncReportWithMonday(report: Awaited<ReturnType<typeof getReport>>) {
+  if (!report) {
+    return report;
+  }
+
+  try {
+    const boardConfig = await getMondayBoardConfigForSync();
+    if (!boardConfig) {
+      console.warn("No monday.com board configuration found, skipping monday sync.");
+      return report;
+    }
+
+    const itemId = await pushReportToMonday(boardConfig, report);
+    if (itemId && itemId !== report.mondayItemId) {
+      return (await updateReportMondayItemId(report.id, itemId)) ?? report;
+    }
+  } catch (error) {
+    console.error("Failed to sync report to monday.com:", error);
+  }
+
+  return report;
 }
 
 export const getSubmissionRecipients = createServerFn({ method: "POST" })
@@ -112,13 +147,7 @@ export const submitForReview = createServerFn({ method: "POST" })
     await createReviewToken(report.id, "review", report.npuTeamEmail);
     await sendSubmissionNotifications(report);
 
-    const boardConfig = await getActiveMondayBoardConfig();
-    if (boardConfig) {
-      const itemId = await pushReportToMonday(boardConfig, report, data.pdfBase64);
-      if (itemId) {
-        await updateReportMondayItemId(report.id, itemId);
-      }
-    }
+    await syncReportWithMonday(report);
 
     return (await getReport(report.id)) ?? report;
   });
@@ -160,14 +189,7 @@ export const requestReportChanges = createServerFn({ method: "POST" })
       comments: data.comments || "Changes requested.",
     });
 
-    const boardConfig = await getActiveMondayBoardConfig();
-    if (boardConfig && report.mondayItemId) {
-      try {
-        await updateMondayItemStatus(boardConfig, report.mondayItemId, "Changes Requested");
-      } catch (err) {
-        console.error("Failed to update Monday status to Changes Requested:", err);
-      }
-    }
+    await syncReportWithMonday(report);
 
     return getReport(data.reportId);
   });
@@ -215,14 +237,7 @@ export const finalizeReport = createServerFn({ method: "POST" })
       comments: "Final report route marked as finalized PDF source.",
     });
 
-    const boardConfig = await getActiveMondayBoardConfig();
-    if (boardConfig && report.mondayItemId) {
-      try {
-        await updateMondayItemStatus(boardConfig, report.mondayItemId, "Finalized");
-      } catch (err) {
-        console.error("Failed to update Monday status to Finalized:", err);
-      }
-    }
+    await syncReportWithMonday(report);
 
     return getReport(data.reportId);
   });
