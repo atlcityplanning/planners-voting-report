@@ -480,9 +480,19 @@ export default function VotingReportForm() {
         },
       });
 
+      const defaults = getNpuContactDefault(form.state.values.npu);
+      if (defaults) {
+        if (form.state.values.chair !== defaults.chairName) {
+          recipients.chairEmail = "";
+        }
+        if (form.state.values.planner !== defaults.plannerName) {
+          recipients.plannerEmail = "";
+        }
+      }
+
       if (import.meta.env.DEV) {
-        recipients.chairEmail = "chair@example.com";
-        recipients.plannerEmail = "planner@example.com";
+        if (recipients.chairEmail !== "") recipients.chairEmail = "chair@example.com";
+        if (recipients.plannerEmail !== "") recipients.plannerEmail = "planner@example.com";
       }
 
       setSubmissionRecipients(recipients);
