@@ -617,9 +617,6 @@ export default function VotingReportForm() {
         />
         <div className="grid items-center gap-5 sm:grid-cols-[1fr_auto]">
           <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground print:text-black">
-              City of Atlanta Department of City Planning
-            </p>
             <h1
               id="report-heading"
               className="m-0 font-display text-5xl font-semibold uppercase leading-none tracking-normal text-foreground sm:text-6xl print:text-3xl"

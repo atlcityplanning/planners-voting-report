@@ -8,16 +8,7 @@ export default function SiteHeader() {
           NPU Planner&apos;s Voting Report
         </Link>
 
-        <div className="flex flex-wrap items-center gap-4 text-sm font-semibold text-muted-foreground">
-          <Link
-            to="/"
-            className="text-muted-foreground no-underline transition-colors hover:text-foreground"
-            activeProps={{
-              className: "text-foreground no-underline transition-colors",
-            }}
-          >
-            Report
-          </Link>
+        <nav className="flex flex-wrap items-center gap-4 text-sm font-semibold text-muted-foreground">
           <a
             href="https://www.atlantaga.gov/government/departments/city-planning"
             className="text-muted-foreground no-underline transition-colors hover:text-foreground"
@@ -34,7 +25,7 @@ export default function SiteHeader() {
           >
             Updates
           </a>
-        </div>
+        </nav>
       </nav>
     </header>
   );
