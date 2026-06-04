@@ -29,10 +29,9 @@ import type { AgendaItem, ItemType, Recommendation, ReportFormState } from "@/li
 import { useStore } from "@tanstack/react-form";
 import { useAppForm } from "@/hooks/form";
 import { NPU_CONTACT_SOURCE, getNpuContactDefault } from "@/lib/npuContactDirectory";
-import type { SubmissionRecipients } from "@/lib/votingReportWorkflow";
+
 import { getSubmissionRecipients, submitForReview } from "@/server/reportActions";
 import {
-  type VotingReportDraft,
   VOTING_REPORT_DRAFT_ID,
   votingReportDraftCollection,
 } from "@/stores/voting-report-draft-db";
@@ -43,6 +42,19 @@ import { Switch } from "@/components/ui/switch";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
+import { useLiveQuery } from "@tanstack/react-db";
+import { useSelector } from "@tanstack/react-store";
+import {
+  uiStore,
+  setDraggingId,
+  setDialogMessage,
+  setOpenCommentIds,
+  setSubmissionRecipients,
+  setIsPreparingSubmission,
+  setIsSubmittingReport,
+  setSubmissionMessage,
+  setSubmittedReportId,
+} from "@/stores/ui-store";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
@@ -68,11 +80,7 @@ const EMPTY_NEW_ITEM: NewItemForm = {
   comments: "",
 };
 
-const EMPTY_SUBMISSION_RECIPIENTS: SubmissionRecipients = {
-  chairEmail: "",
-  plannerEmail: "",
-  npuTeamEmail: "",
-};
+
 
 const fieldClass =
   "min-h-11 w-full border-2 border-foreground bg-card px-3 py-2 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:ring-0 rounded-none";
@@ -236,22 +244,29 @@ export default function VotingReportForm() {
   const form = useAppForm({
     defaultValues: INITIAL_REPORT_STATE,
   });
-  const report = useStore(form.store, (state: any) => state.values as ReportFormState);
+  const npu = useStore(form.store, (state: any) => state.values.npu);
+  const meetingDate = useStore(form.store, (state: any) => state.values.meetingDate);
+  const chair = useStore(form.store, (state: any) => state.values.chair);
+  const planner = useStore(form.store, (state: any) => state.values.planner);
+  const autofill = useStore(form.store, (state: any) => state.values.autofill);
+  
+  // Non-reactive full report object for callbacks
+  const report = form.state.values as ReportFormState;
   const serializedReport = useStore(form.store, (state: any) => JSON.stringify(state.values));
   const [newItem, setNewItem] = useState<NewItemForm>(EMPTY_NEW_ITEM);
-  const [savedDrafts, setSavedDrafts] = useState<Array<VotingReportDraft>>([]);
-  const [isDraftStoreReady, setIsDraftStoreReady] = useState(false);
   const [hasLoadedStorage, setHasLoadedStorage] = useState(false);
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dialogMessage, setDialogMessage] = useState("");
-  const [openCommentIds, setOpenCommentIds] = useState<Array<string>>([]);
-  const [submissionRecipients, setSubmissionRecipients] = useState<SubmissionRecipients>(
-    EMPTY_SUBMISSION_RECIPIENTS,
+  const { data: drafts = [] } = useLiveQuery((q) =>
+    q.from({ drafts: votingReportDraftCollection })
   );
-  const [isPreparingSubmission, setIsPreparingSubmission] = useState(false);
-  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
-  const [submissionMessage, setSubmissionMessage] = useState("");
-  const [submittedReportId, setSubmittedReportId] = useState("");
+  const isDraftStoreReady = votingReportDraftCollection.isReady();
+  const draggingId = useSelector(uiStore, (state) => state.draggingId);
+  const dialogMessage = useSelector(uiStore, (state) => state.dialogMessage);
+  const openCommentIds = useSelector(uiStore, (state) => state.openCommentIds);
+  const submissionRecipients = useSelector(uiStore, (state) => state.submissionRecipients);
+  const isPreparingSubmission = useSelector(uiStore, (state) => state.isPreparingSubmission);
+  const isSubmittingReport = useSelector(uiStore, (state) => state.isSubmittingReport);
+  const submissionMessage = useSelector(uiStore, (state) => state.submissionMessage);
+  const submittedReportId = useSelector(uiStore, (state) => state.submittedReportId);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const submissionDialogRef = useRef<HTMLDialogElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -260,51 +275,18 @@ export default function VotingReportForm() {
   const navigate = useNavigate();
 
   const printLabels = useMemo(
-    () => getReportPrintLabels(report.npu, report.meetingDate),
-    [report.meetingDate, report.npu],
+    () => getReportPrintLabels(npu, meetingDate),
+    [meetingDate, npu],
   );
-  const pendingCount = useMemo(
-    () => report.items.filter((item) => item.recommendation === "PENDING").length,
-    [report.items],
-  );
+  
   const activeDraft = useMemo(
-    () => savedDrafts.find((draft) => draft.id === VOTING_REPORT_DRAFT_ID),
-    [savedDrafts],
+    () => drafts.find((draft) => draft.id === VOTING_REPORT_DRAFT_ID),
+    [drafts],
   );
-  const reportTitle = report.meetingDate ? printLabels.headerTitle : "VOTING REPORT";
-  const isFormValid = Boolean(report.meetingDate && report.chair?.trim() && report.planner?.trim());
+  const reportTitle = meetingDate ? printLabels.headerTitle : "VOTING REPORT";
+  const isFormValid = Boolean(meetingDate && chair?.trim() && planner?.trim());
 
-  useEffect(() => {
-    let isMounted = true;
 
-    function syncSavedDrafts() {
-      if (!isMounted) {
-        return;
-      }
-
-      setSavedDrafts(votingReportDraftCollection.toArray as Array<VotingReportDraft>);
-    }
-
-    const subscription = votingReportDraftCollection.subscribeChanges(syncSavedDrafts);
-    votingReportDraftCollection.startSyncImmediate();
-    syncSavedDrafts();
-
-    if (votingReportDraftCollection.isReady()) {
-      setIsDraftStoreReady(true);
-    } else {
-      votingReportDraftCollection.onFirstReady(() => {
-        syncSavedDrafts();
-        if (isMounted) {
-          setIsDraftStoreReady(true);
-        }
-      });
-    }
-
-    return () => {
-      isMounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     if (!isDraftStoreReady || hasLoadedStorage) {
@@ -370,7 +352,7 @@ export default function VotingReportForm() {
 
   useEffect(() => {
     function beforePrint() {
-      if (report.meetingDate) {
+      if (meetingDate) {
         document.title = printLabels.documentTitle;
       }
     }
@@ -386,7 +368,7 @@ export default function VotingReportForm() {
       window.removeEventListener("beforeprint", beforePrint);
       window.removeEventListener("afterprint", afterPrint);
     };
-  }, [printLabels.documentTitle, report.meetingDate]);
+  }, [printLabels.documentTitle, meetingDate]);
 
   function showDialog(message: string) {
     setDialogMessage(message);
@@ -426,7 +408,7 @@ export default function VotingReportForm() {
 
   function handleNewItemTypeChange(itemTypeValue: string) {
     const itemType = normalizeItemType(itemTypeValue);
-    const defaults = getApplicationDefaults(itemType, report.autofill);
+    const defaults = getApplicationDefaults(itemType, autofill);
 
     setNewItem({
       itemType,
@@ -439,10 +421,10 @@ export default function VotingReportForm() {
   }
 
   function handleNewApplicationName(value: string) {
-    const defaults = getApplicationDefaults(newItem.itemType, report.autofill);
+    const defaults = getApplicationDefaults(newItem.itemType, autofill);
     setNewItem((currentItem) => ({
       ...currentItem,
-      applicationName: applyApplicationTemplate(value, defaults.template, report.autofill),
+      applicationName: applyApplicationTemplate(value, defaults.template, autofill),
     }));
   }
 
@@ -476,7 +458,7 @@ export default function VotingReportForm() {
   }
 
   function handleClearTable() {
-    if (report.items.length > 0 && !window.confirm("Clear all agenda items and planner notes?")) {
+    if (form.state.values.items.length > 0 && !window.confirm("Clear all agenda items and planner notes?")) {
       return;
     }
 
@@ -537,14 +519,16 @@ export default function VotingReportForm() {
   }
 
   async function prepareSubmission() {
-    if (!report.meetingDate) {
+    if (!form.state.values.meetingDate) {
       dateInputRef.current?.focus();
       dateInputRef.current?.showPicker?.();
       return;
     }
 
+    const currentPendingCount = form.state.values.items.filter((item) => item.recommendation === "PENDING").length;
+
     if (
-      pendingCount > 0 &&
+      currentPendingCount > 0 &&
       !window.confirm("Some items do not have recommendations. Submit the report anyway?")
     ) {
       return;
@@ -555,7 +539,7 @@ export default function VotingReportForm() {
     try {
       const recipients = await getSubmissionRecipients({
         data: {
-          npu: report.npu,
+          npu: form.state.values.npu,
         },
       });
 
@@ -829,20 +813,22 @@ export default function VotingReportForm() {
               )}
             </form.Field>
           </label>
-          <label className="flex justify-center items-center gap-3 print:hidden">
-            <span className="self-center text-sm font-bold text-foreground">
+          <div className="flex justify-center items-center gap-3 print:hidden">
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground self-center print:text-black">
               Autofill application numbers
             </span>
-            <form.Field name="autofill">
-              {(field) => (
-                <Switch
-                  checked={field.state.value}
-                  onCheckedChange={handleAutofillChange}
-                  onBlur={field.handleBlur}
-                />
-              )}
-            </form.Field>
-          </label>
+            <div className="flex h-11 items-center">
+              <form.Field name="autofill">
+                {(field) => (
+                  <Switch
+                    checked={field.state.value}
+                    onCheckedChange={handleAutofillChange}
+                    onBlur={field.handleBlur}
+                  />
+                )}
+              </form.Field>
+            </div>
+          </div>
         </div>
         <p className="m-0 mt-3 text-xs font-semibold text-muted-foreground print:hidden">
           Chair and planner defaults use the {NPU_CONTACT_SOURCE.version} contact list, revised{" "}
@@ -858,11 +844,13 @@ export default function VotingReportForm() {
           <h2 id="new-item" className="m-0 mb-6 text-2xl font-bold uppercase tracking-wide text-foreground print:text-black">
             New Item
           </h2>
-          {pendingCount > 0 ? (
+          <form.Subscribe selector={(state: any) => state.values.items.filter((i: AgendaItem) => i.recommendation === "PENDING").length}>
+          {(pendingCount) => pendingCount > 0 ? (
             <span className="rounded-full bg-warning px-3 py-1 text-xs font-bold text-warning-foreground ring-1 ring-warning-foreground/20">
               {pendingCount} pending
             </span>
           ) : null}
+          </form.Subscribe>
         </div>
 
         <form
@@ -902,7 +890,7 @@ export default function VotingReportForm() {
               onFocus={moveCursorToEnd}
               placeholder={
                 newItem.itemType
-                  ? getApplicationDefaults(newItem.itemType, report.autofill).placeholder
+                  ? getApplicationDefaults(newItem.itemType, autofill).placeholder
                   : "Application number or name"
               }
               type="text"
@@ -1032,7 +1020,8 @@ export default function VotingReportForm() {
                 </TableHead>
               </TableRow>
             </TableHeader>
-            {report.items.length === 0 ? (
+            <form.Subscribe selector={(state: any) => state.values.items}>
+            {(items: AgendaItem[]) => items.length === 0 ? (
               <TableBody>
                 <TableRow>
                   <TableCell
@@ -1052,7 +1041,7 @@ export default function VotingReportForm() {
                 </TableRow>
               </TableBody>
             ) : (
-              report.items.map((item: AgendaItem, index: number) => {
+              items.map((item: AgendaItem, index: number) => {
                 const showComments =
                   item.comments.trim() || item.motion.trim() || item.applicantPresent || openCommentIds.includes(item.id);
 
@@ -1212,6 +1201,7 @@ export default function VotingReportForm() {
                 );
               })
             )}
+            </form.Subscribe>
           </Table>
         </div>
       </section>

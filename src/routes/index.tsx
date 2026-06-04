@@ -1,4 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, ClientOnly } from "@tanstack/react-router";
 import VotingReportForm from "@/components/voting-report-form";
 
-export const Route = createFileRoute("/")({ component: VotingReportForm });
+export const Route = createFileRoute("/")({ 
+  component: () => (
+    <ClientOnly>
+      <VotingReportForm />
+    </ClientOnly>
+  )
+});
