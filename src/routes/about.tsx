@@ -13,9 +13,7 @@ function About() {
           NPU Planner&apos;s Voting Report
         </h1>
         <p className="mb-0 mt-4 leading-7">
-          This TanStack Start app replaces the legacy static voting form with a
-          typed React workflow for NPU agenda items, recommendations, local
-          persistence, and print-ready reports.
+          This application allows planners to manage NPU agenda items, record voting recommendations, and generate print-ready official reports for the Department of City Planning.
         </p>
       </section>
     </main>

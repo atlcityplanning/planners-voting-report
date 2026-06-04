@@ -1,6 +1,6 @@
 export default function SiteFooter() {
   return (
-    <footer className="border-t border-border px-4 py-8 text-sm text-muted-foreground print:hidden">
+    <footer className="mt-auto border-t border-border px-4 py-8 text-sm text-muted-foreground print:hidden">
       <div className="mx-auto w-[min(1180px,calc(100%-2rem))]">
         <p className="m-0">
           Built and maintained by the{" "}
