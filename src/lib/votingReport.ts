@@ -41,12 +41,13 @@ export const ITEM_TYPES = [
 
 export const RECOMMENDATIONS = [
   { value: 'PENDING', label: 'Recommend' },
-  { value: 'Approval', label: 'Approval' },
-  { value: 'Approval w/C', label: 'Approval w/C' },
-  { value: 'Denial', label: 'Denial' },
+  { value: 'Support/Approve', label: 'Support/Approve' },
+  { value: 'Support/Approve with conditions', label: 'Support/Approve with conditions' },
+  { value: 'Nonsupport/Denial', label: 'Nonsupport/Denial' },
   { value: 'Defer', label: 'Defer' },
   { value: 'Abstain', label: 'Abstain' },
-  { value: 'R&C', label: 'Review & Comment' },
+  { value: 'Applicant Not Present', label: 'Applicant Not Present' },
+  { value: 'Review and Comment', label: 'Review and Comment' },
 ] as const
 
 export type ItemType = (typeof ITEM_TYPES)[number]['value']
@@ -57,6 +58,8 @@ export type AgendaItem = {
   itemType: ItemType
   applicationName: string
   recommendation: Recommendation
+  motion: string
+  applicantPresent: "yes" | "no" | ""
   comments: string
 }
 
@@ -91,12 +94,12 @@ const APPLICATION_DEFAULTS: Record<string, Omit<ApplicationDefaults, 'value'>> =
   SD: {
     placeholder: 'SD-',
     template: 'SD-xx-xxx',
-    recommendation: 'R&C',
+    recommendation: 'Review and Comment',
   },
   LOR: {
     placeholder: 'LOR-',
     template: 'LOR-xx-xxx',
-    recommendation: 'R&C',
+    recommendation: 'Review and Comment',
   },
   'N/A': { placeholder: DEFAULT_APPLICATION_PLACEHOLDER },
 }

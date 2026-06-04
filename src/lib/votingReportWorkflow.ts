@@ -121,6 +121,8 @@ export const agendaItemSchema = z
     itemType: z.string().min(1).transform(normalizeItemType),
     applicationName: z.string().trim().min(1, "Application # / Name is required."),
     recommendation: z.string().min(1).transform(normalizeRecommendation),
+    motion: z.string().optional().default(""),
+    applicantPresent: z.enum(["yes", "no", ""]).optional().default(""),
     comments: z.string().optional().default(""),
   })
   .transform(
@@ -197,6 +199,8 @@ export function normalizeAgendaItems(items: Array<AgendaItem>): Array<AgendaItem
     itemType: normalizeItemType(item.itemType),
     applicationName: item.applicationName.trim(),
     recommendation: normalizeRecommendation(item.recommendation),
+    motion: item.motion || "",
+    applicantPresent: item.applicantPresent || "",
     comments: item.comments,
   }));
 }

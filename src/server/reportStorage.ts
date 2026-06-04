@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS voting_report_items (
   item_type TEXT NOT NULL,
   application_name TEXT NOT NULL,
   recommendation TEXT NOT NULL,
+  motion TEXT NOT NULL DEFAULT '',
+  applicant_present TEXT NOT NULL DEFAULT '',
   comments TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   FOREIGN KEY (report_id) REFERENCES voting_reports(id) ON DELETE CASCADE
@@ -164,6 +166,8 @@ type ItemRow = {
   item_type: string;
   application_name: string;
   recommendation: string;
+  motion: string;
+  applicant_present: string;
   comments: string;
 };
 
@@ -352,6 +356,18 @@ async function ensureSchema(db: D1Database) {
     "monday_item_id",
     "ALTER TABLE voting_reports ADD COLUMN monday_item_id TEXT NOT NULL DEFAULT ''",
   );
+  await ensureColumn(
+    db,
+    "voting_report_items",
+    "motion",
+    "ALTER TABLE voting_report_items ADD COLUMN motion TEXT NOT NULL DEFAULT ''",
+  );
+  await ensureColumn(
+    db,
+    "voting_report_items",
+    "applicant_present",
+    "ALTER TABLE voting_report_items ADD COLUMN applicant_present TEXT NOT NULL DEFAULT ''",
+  );
 
   await db
     .prepare(
@@ -398,7 +414,7 @@ async function hydrateD1Report(db: D1Database, row: ReportRow): Promise<StoredVo
     await Promise.all([
       db
         .prepare(
-          `SELECT id, item_type, application_name, recommendation, comments
+          `SELECT id, item_type, application_name, recommendation, motion, applicant_present, comments
           FROM voting_report_items
           WHERE report_id = ?
           ORDER BY position ASC`,
@@ -448,6 +464,8 @@ async function hydrateD1Report(db: D1Database, row: ReportRow): Promise<StoredVo
     itemType: item.item_type as AgendaItem["itemType"],
     applicationName: item.application_name,
     recommendation: item.recommendation as AgendaItem["recommendation"],
+    motion: item.motion,
+    applicantPresent: item.applicant_present as AgendaItem["applicantPresent"],
     comments: item.comments,
   }));
   const signatures = createEmptySignatures();
@@ -596,20 +614,22 @@ export async function upsertReport(input: ReportUpsertInput) {
   await db.prepare("DELETE FROM voting_report_items WHERE report_id = ?").bind(storedReport.id).run();
   if (storedReport.report.items.length > 0) {
     await db.batch(
-      storedReport.report.items.map((item, position) =>
+      storedReport.report.items.map((item, index) =>
         db
           .prepare(
             `INSERT INTO voting_report_items
-              (id, report_id, position, item_type, application_name, recommendation, comments)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              (id, report_id, position, item_type, application_name, recommendation, motion, applicant_present, comments)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
           .bind(
             createId(),
             storedReport.id,
-            position,
+            index,
             item.itemType,
             item.applicationName,
             item.recommendation,
+            item.motion,
+            item.applicantPresent,
             item.comments,
           ),
       ),

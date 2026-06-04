@@ -44,6 +44,8 @@ type NewItemForm = {
   itemType: ItemType | "";
   applicationName: string;
   recommendation: Recommendation;
+  motion: string;
+  applicantPresent: "yes" | "no" | "";
   comments: string;
 };
 
@@ -51,6 +53,8 @@ const EMPTY_NEW_ITEM: NewItemForm = {
   itemType: "",
   applicationName: "",
   recommendation: "PENDING",
+  motion: "",
+  applicantPresent: "",
   comments: "",
 };
 
@@ -111,6 +115,8 @@ function sanitizeItem(item: unknown): AgendaItem | null {
     itemType,
     applicationName,
     recommendation: normalizeRecommendation(readString(candidate.recommendation)),
+    motion: readString(candidate.motion),
+    applicantPresent: (readString(candidate.applicantPresent) as "yes" | "no" | "") || "",
     comments: readString(candidate.comments),
   };
 }
@@ -162,6 +168,8 @@ function parseLegacyItems(serializedItems: string | null): Array<AgendaItem> {
           itemType: normalizeItemType(cells[0]?.textContent?.trim() ?? ""),
           applicationName,
           recommendation: normalizeRecommendation(cells[2]?.textContent?.trim() ?? "PENDING"),
+          motion: "",
+          applicantPresent: "" as const,
           comments: rows[1]?.textContent?.trim() ?? "",
         };
       })
@@ -421,6 +429,8 @@ export default function VotingReportForm() {
       itemType,
       applicationName: defaults.value,
       recommendation: defaults.recommendation ?? "PENDING",
+      motion: "",
+      applicantPresent: "",
       comments: "",
     });
   }
@@ -453,6 +463,8 @@ export default function VotingReportForm() {
       itemType: newItem.itemType,
       applicationName: newItem.applicationName.trim(),
       recommendation: newItem.recommendation,
+      motion: newItem.motion.trim(),
+      applicantPresent: newItem.applicantPresent,
       comments: newItem.comments.trim(),
     };
 
@@ -491,7 +503,7 @@ export default function VotingReportForm() {
   }
 
   function closeEmptyCommentEditor(item: AgendaItem) {
-    if (item.comments.trim()) {
+    if (item.comments.trim() || item.motion.trim() || item.applicantPresent) {
       return;
     }
 
@@ -927,6 +939,44 @@ export default function VotingReportForm() {
             </span>
           </label>
           <label className="grid gap-1 lg:col-span-4">
+            <span className={labelClass}>Was the applicant present?</span>
+            <span className="relative">
+              <select
+                className={cn(screenFieldClass, "appearance-none pr-10")}
+                value={newItem.applicantPresent}
+                onChange={(event) =>
+                  setNewItem((currentItem) => ({
+                    ...currentItem,
+                    applicantPresent: event.target.value as "yes" | "no" | "",
+                  }))
+                }
+              >
+                <option value="" disabled>Select an option</option>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+              </select>
+              <ChevronDown
+                aria-hidden="true"
+                className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground print:hidden"
+              />
+            </span>
+          </label>
+          <label className="grid gap-1 lg:col-span-4">
+            <span className={labelClass}>Motion &amp; Votes</span>
+            <input
+              className={screenFieldClass}
+              value={newItem.motion}
+              onChange={(event) =>
+                setNewItem((currentItem) => ({
+                  ...currentItem,
+                  motion: event.target.value,
+                }))
+              }
+              type="text"
+              placeholder="Motion to approve with conditions, seconded; 16 Y, 3 N, 4 A"
+            />
+          </label>
+          <label className="grid gap-1 lg:col-span-4">
             <span className={labelClass}>Comments / Conditions</span>
             <textarea
               className={cn(screenFieldClass, "min-h-20 resize-y")}
@@ -994,7 +1044,8 @@ export default function VotingReportForm() {
               </tbody>
             ) : (
               report.items.map((item: AgendaItem, index: number) => {
-                const showComments = item.comments.trim() || openCommentIds.includes(item.id);
+                const showComments =
+                  item.comments.trim() || item.motion.trim() || item.applicantPresent || openCommentIds.includes(item.id);
 
                 return (
                   <tbody
@@ -1040,7 +1091,7 @@ export default function VotingReportForm() {
                             <select
                               className={cn(
                                 inlineEditClass,
-                                "text-right",
+                                "appearance-none text-right",
                                 field.state.value === "PENDING"
                                   ? "font-bold text-warning-foreground"
                                   : "text-foreground",
@@ -1089,26 +1140,62 @@ export default function VotingReportForm() {
                         <td
                           colSpan={4}
                           className={
-                            item.comments.trim()
+                            item.comments.trim() || item.motion.trim()
                               ? "border-b border-border bg-muted px-3 py-2 print:border print:border-neutral-600 print:bg-white print:px-2 print:py-1"
                               : "border-b border-border bg-muted px-3 py-2 print:hidden"
                           }
                         >
-                          <form.Field name={`items[${index}].comments`}>
-                            {(field) => (
-                              <textarea
-                                className={cn(inlineEditClass, "min-h-14 resize-y")}
-                                value={field.state.value}
-                                onChange={(event) => field.handleChange(event.target.value)}
-                                onBlur={() => {
-                                  field.handleBlur();
-                                  closeEmptyCommentEditor(item);
-                                }}
-                                rows={2}
-                                aria-label={`Comments for ${item.applicationName}`}
-                              />
-                            )}
-                          </form.Field>
+                          <div className="flex flex-col gap-2">
+                            <form.Field name={`items[${index}].applicantPresent`}>
+                              {(field) => (
+                                <select
+                                  className={cn(inlineEditClass, "appearance-none font-bold")}
+                                  value={field.state.value}
+                                  onChange={(event) => field.handleChange(event.target.value as "yes" | "no" | "")}
+                                  onBlur={() => {
+                                    field.handleBlur();
+                                    closeEmptyCommentEditor(item);
+                                  }}
+                                  aria-label={`Was applicant present for ${item.applicationName}`}
+                                >
+                                  <option value="" disabled>Was the applicant present?</option>
+                                  <option value="yes">Yes</option>
+                                  <option value="no">No</option>
+                                </select>
+                              )}
+                            </form.Field>
+                            <form.Field name={`items[${index}].motion`}>
+                              {(field) => (
+                                <input
+                                  className={cn(inlineEditClass, "font-bold")}
+                                  value={field.state.value}
+                                  onChange={(event) => field.handleChange(event.target.value)}
+                                  onBlur={() => {
+                                    field.handleBlur();
+                                    closeEmptyCommentEditor(item);
+                                  }}
+                                  placeholder="Motion to ..., 16 Y, 3 N, 4 A"
+                                  aria-label={`Motion for ${item.applicationName}`}
+                                />
+                              )}
+                            </form.Field>
+                            <form.Field name={`items[${index}].comments`}>
+                              {(field) => (
+                                <textarea
+                                  className={cn(inlineEditClass, "min-h-14 resize-y")}
+                                  value={field.state.value}
+                                  onChange={(event) => field.handleChange(event.target.value)}
+                                  onBlur={() => {
+                                    field.handleBlur();
+                                    closeEmptyCommentEditor(item);
+                                  }}
+                                  rows={2}
+                                  placeholder="Comments / Conditions"
+                                  aria-label={`Comments for ${item.applicationName}`}
+                                />
+                              )}
+                            </form.Field>
+                          </div>
                         </td>
                       </tr>
                     ) : null}

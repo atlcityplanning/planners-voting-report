@@ -32,7 +32,7 @@ describe('voting report helpers', () => {
     expect(getApplicationDefaults('SD', true)).toMatchObject({
       placeholder: 'SD-',
       value: 'SD-2',
-      recommendation: 'R&C',
+      recommendation: 'Review and Comment',
       template: 'SD-xx-xxx',
     })
     expect(getApplicationDefaults('MOSE', true)).toMatchObject({
