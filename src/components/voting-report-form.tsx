@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquarePlus,
+  FileText,
   Plus,
   RotateCcw,
   Send,
@@ -35,7 +36,16 @@ import {
   VOTING_REPORT_DRAFT_ID,
   votingReportDraftCollection,
 } from "@/stores/voting-report-draft-db";
+
 import { cn } from "@/utils/cn";
+
+import { Switch } from "@/components/ui/switch";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 
 const LEGACY_STORAGE_KEY = "npu-voting-report:v1";
 const INITIAL_REPORT_JSON = JSON.stringify(INITIAL_REPORT_STATE);
@@ -64,13 +74,6 @@ const EMPTY_SUBMISSION_RECIPIENTS: SubmissionRecipients = {
   npuTeamEmail: "",
 };
 
-const labelClass = "text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black";
-const printLabelClass = labelClass;
-const sectionHeadingClass = "m-0 mb-6 text-2xl font-bold uppercase tracking-wide text-foreground print:text-black";
-const reportPanelClass =
-  "mb-8 border-2 border-foreground bg-card p-6 text-sm text-foreground print:mb-6 print:border-0 print:p-0";
-const screenPanelClass =
-  "mb-8 border-2 border-foreground bg-card p-6 text-sm text-foreground print:hidden";
 const fieldClass =
   "min-h-11 w-full border-2 border-foreground bg-card px-3 py-2 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:ring-0 rounded-none";
 const selectFieldClass = cn(fieldClass, "appearance-none pr-10");
@@ -151,7 +154,7 @@ function parseLegacyItems(serializedItems: string | null): Array<AgendaItem> {
       return [];
     }
 
-    const documentFragment = new DOMParser().parseFromString(`<table>${html}</table>`, "text/html");
+    const documentFragment = new DOMParser().parseFromString(`<table>${html}</Table>`, "text/html");
 
     return Array.from(documentFragment.querySelectorAll("tbody"))
       .map((body) => {
@@ -557,8 +560,8 @@ export default function VotingReportForm() {
       });
 
       if (import.meta.env.DEV) {
-        recipients.chairEmail = "drejohnson212@gmail.com";
-        recipients.plannerEmail = "dejohnson@atlantaga.gov";
+        recipients.chairEmail = "chair@example.com";
+        recipients.plannerEmail = "planner@example.com";
       }
 
       setSubmissionRecipients(recipients);
@@ -611,13 +614,13 @@ export default function VotingReportForm() {
         className="m-auto w-[min(26rem,calc(100%-2rem))] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-foreground/40"
       >
         <p className="m-0 mb-4 text-sm text-muted-foreground">{dialogMessage}</p>
-        <button
+        <Button
           type="button"
           className={subtleButtonClass}
           onClick={() => dialogRef.current?.close()}
         >
           OK
-        </button>
+        </Button>
       </dialog>
 
       <dialog
@@ -634,9 +637,9 @@ export default function VotingReportForm() {
         </div>
         <form className="grid gap-4" onSubmit={handleSubmitForReview}>
           <label className="grid gap-1">
-            <span className={labelClass}>NPU Chair Email</span>
-            <input
-              className={cn(screenFieldClass, !import.meta.env.DEV && "read-only:opacity-60 read-only:cursor-not-allowed")}
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">NPU Chair Email</span>
+            <Input
+              className={cn("rounded-none", !import.meta.env.DEV && "read-only:opacity-60 read-only:cursor-not-allowed")}
               value={submissionRecipients.chairEmail}
               onChange={(event) =>
                 setSubmissionRecipients((currentRecipients) => ({
@@ -651,9 +654,9 @@ export default function VotingReportForm() {
           </label>
 
           <label className="grid gap-1">
-            <span className={labelClass}>Planner CC</span>
-            <input
-              className={screenFieldClass}
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Planner CC</span>
+            <Input
+              className="rounded-none"
               value={submissionRecipients.plannerEmail}
               onChange={(event) =>
                 setSubmissionRecipients((currentRecipients) => ({
@@ -679,21 +682,21 @@ export default function VotingReportForm() {
             </a>
           ) : null}
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <button
+            <Button
               type="button"
               className={subtleButtonClass}
               onClick={() => submissionDialogRef.current?.close()}
             >
               Close
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               className={primaryButtonClass}
               disabled={isSubmittingReport}
             >
               <Send aria-hidden="true" size={18} />
               {isSubmittingReport ? "Submitting" : "Submit for Review"}
-            </button>
+            </Button>
           </div>
         </form>
       </dialog>
@@ -717,24 +720,24 @@ export default function VotingReportForm() {
             </h1>
           </div>
           <div className="flex items-center gap-2 print:hidden">
-            <button
+            <Button
               type="button"
               className={cn(subtleButtonClass, "sm:min-w-32")}
               onClick={handleClearTable}
             >
               <RotateCcw aria-hidden="true" size={18} />
               Clear Table
-            </button>
+            </Button>
           </div>
         </div>
       </header>
 
       <section
-        className={reportPanelClass}
+        className="mb-8 border-2 border-foreground bg-card p-6 text-sm text-foreground print:mb-6 print:border-0 print:p-0"
         aria-labelledby="page-info-heading"
       >
         <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 id="page-info-heading" className={sectionHeadingClass}>
+          <h2 id="page-info-heading" className="m-0 mb-6 text-2xl font-bold uppercase tracking-wide text-foreground print:text-black">
             Report Details
           </h2>
           <span className="text-xs font-bold text-muted-foreground print:hidden">
@@ -744,22 +747,22 @@ export default function VotingReportForm() {
 
         <div className="grid gap-3 sm:grid-cols-[minmax(6rem,0.55fr)_repeat(2,minmax(12rem,1fr))] print:grid-cols-2 print:gap-x-8 print:gap-y-2">
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className={printLabelClass}>NPU</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">NPU</span>
             <span className="relative block">
               <form.Field name="npu">
                 {(field) => (
-                  <select
+                  <NativeSelect
                     className={selectFieldClass}
                     value={field.state.value}
                     onChange={(event) => handleNpuChange(event.target.value)}
                     onBlur={field.handleBlur}
                   >
                     {NPU_OPTIONS.map((npu) => (
-                      <option key={npu} value={npu}>
+                      <NativeSelectOption key={npu} value={npu}>
                         {npu}
-                      </option>
+                      </NativeSelectOption>
                     ))}
-                  </select>
+                  </NativeSelect>
                 )}
               </form.Field>
               <ChevronDown
@@ -769,11 +772,11 @@ export default function VotingReportForm() {
             </span>
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className={printLabelClass}>Chair</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Chair</span>
             <form.Field name="chair">
               {(field) => (
-                <input
-                  className={fieldClass}
+                <Input
+                  className="print:border-0 print:bg-transparent print:p-0 print:ring-0 rounded-none"
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   onBlur={field.handleBlur}
@@ -783,7 +786,7 @@ export default function VotingReportForm() {
             </form.Field>
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className={printLabelClass}>Meeting Date</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Meeting Date</span>
             <form.Field name="meetingDate">
               {(field) => (
                 <input
@@ -799,11 +802,11 @@ export default function VotingReportForm() {
             </form.Field>
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className={printLabelClass}>Location</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Location</span>
             <form.Field name="location">
               {(field) => (
-                <input
-                  className={fieldClass}
+                <Input
+                  className="print:border-0 print:bg-transparent print:p-0 print:ring-0 rounded-none"
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   onBlur={field.handleBlur}
@@ -813,11 +816,11 @@ export default function VotingReportForm() {
             </form.Field>
           </label>
           <label className="grid gap-1 print:grid-cols-[max-content_1fr] print:items-baseline print:gap-2">
-            <span className={printLabelClass}>Planner</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Planner</span>
             <form.Field name="planner">
               {(field) => (
-                <input
-                  className={fieldClass}
+                <Input
+                  className="print:border-0 print:bg-transparent print:p-0 print:ring-0 rounded-none"
                   value={field.state.value}
                   onChange={(event) => field.handleChange(event.target.value)}
                   onBlur={field.handleBlur}
@@ -826,18 +829,16 @@ export default function VotingReportForm() {
               )}
             </form.Field>
           </label>
-          <label className="grid grid-cols-[1fr_auto] items-center gap-3 print:hidden">
+          <label className="flex justify-center items-center gap-3 print:hidden">
             <span className="self-center text-sm font-bold text-foreground">
               Autofill application numbers
             </span>
             <form.Field name="autofill">
               {(field) => (
-                <input
-                  className="relative h-7 w-12 appearance-none rounded-full border border-input bg-transparent p-0 transition checked:border-primary before:absolute before:left-1 before:top-1 before:h-5 before:w-5 before:rounded-full before:bg-muted-foreground before:transition checked:before:translate-x-5 checked:before:bg-primary focus:outline-none focus:ring-4 focus:ring-primary/15"
+                <Switch
                   checked={field.state.value}
-                  onChange={(event) => handleAutofillChange(event.target.checked)}
+                  onCheckedChange={handleAutofillChange}
                   onBlur={field.handleBlur}
-                  type="checkbox"
                 />
               )}
             </form.Field>
@@ -850,11 +851,11 @@ export default function VotingReportForm() {
       </section>
 
       <section
-        className={screenPanelClass}
+        className="mb-8 border-2 border-foreground bg-card p-6 text-sm text-foreground print:hidden"
         aria-labelledby="new-item"
       >
         <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 id="new-item" className={sectionHeadingClass}>
+          <h2 id="new-item" className="m-0 mb-6 text-2xl font-bold uppercase tracking-wide text-foreground print:text-black">
             New Item
           </h2>
           {pendingCount > 0 ? (
@@ -869,23 +870,23 @@ export default function VotingReportForm() {
           onSubmit={handleAddItem}
         >
           <label className="grid gap-1">
-            <span className={labelClass}>Type</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Type</span>
             <span className="relative block">
-              <select
+              <NativeSelect
                 className={cn(screenFieldClass, "appearance-none pr-10")}
                 value={newItem.itemType}
                 onChange={(event) => handleNewItemTypeChange(event.target.value)}
                 required
               >
-                <option value="" disabled>
+                <NativeSelectOption value="" disabled>
                   Type
-                </option>
+                </NativeSelectOption>
                 {ITEM_TYPES.map((itemType) => (
-                  <option key={itemType.value} value={itemType.value}>
+                  <NativeSelectOption key={itemType.value} value={itemType.value}>
                     {itemType.label}
-                  </option>
+                  </NativeSelectOption>
                 ))}
-              </select>
+              </NativeSelect>
               <ChevronDown
                 aria-hidden="true"
                 className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground print:hidden"
@@ -893,9 +894,9 @@ export default function VotingReportForm() {
             </span>
           </label>
           <label className="grid min-w-0 gap-1">
-            <span className={labelClass}>Application # / Name</span>
-            <input
-              className={screenFieldClass}
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Application # / Name</span>
+            <Input
+              className="rounded-none"
               value={newItem.applicationName}
               onChange={(event) => handleNewApplicationName(event.target.value)}
               onFocus={moveCursorToEnd}
@@ -910,9 +911,9 @@ export default function VotingReportForm() {
             />
           </label>
           <label className="grid gap-1">
-            <span className={labelClass}>Recommendation</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Recommendation</span>
             <span className="relative block">
-              <select
+              <NativeSelect
                 className={cn(screenFieldClass, "appearance-none pr-10")}
                 value={newItem.recommendation}
                 onChange={(event) =>
@@ -923,15 +924,15 @@ export default function VotingReportForm() {
                 }
               >
                 {RECOMMENDATIONS.map((recommendation) => (
-                  <option
+                  <NativeSelectOption
                     key={recommendation.value}
                     value={recommendation.value}
                     disabled={recommendation.value === "PENDING"}
                   >
                     {recommendation.label}
-                  </option>
+                  </NativeSelectOption>
                 ))}
-              </select>
+              </NativeSelect>
               <ChevronDown
                 aria-hidden="true"
                 className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground print:hidden"
@@ -939,9 +940,9 @@ export default function VotingReportForm() {
             </span>
           </label>
           <label className="grid gap-1 lg:col-span-4">
-            <span className={labelClass}>Was the applicant present?</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Was the applicant present?</span>
             <span className="relative">
-              <select
+              <NativeSelect
                 className={cn(screenFieldClass, "appearance-none pr-10")}
                 value={newItem.applicantPresent}
                 onChange={(event) =>
@@ -951,10 +952,10 @@ export default function VotingReportForm() {
                   }))
                 }
               >
-                <option value="" disabled>Select an option</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </select>
+                <NativeSelectOption value="" disabled>Select an option</NativeSelectOption>
+                <NativeSelectOption value="yes">Yes</NativeSelectOption>
+                <NativeSelectOption value="no">No</NativeSelectOption>
+              </NativeSelect>
               <ChevronDown
                 aria-hidden="true"
                 className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground print:hidden"
@@ -962,9 +963,9 @@ export default function VotingReportForm() {
             </span>
           </label>
           <label className="grid gap-1 lg:col-span-4">
-            <span className={labelClass}>Motion &amp; Votes</span>
-            <input
-              className={screenFieldClass}
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Motion &amp; Votes</span>
+            <Input
+              className="rounded-none"
               value={newItem.motion}
               onChange={(event) =>
                 setNewItem((currentItem) => ({
@@ -977,9 +978,9 @@ export default function VotingReportForm() {
             />
           </label>
           <label className="grid gap-1 lg:col-span-4">
-            <span className={labelClass}>Comments / Conditions</span>
-            <textarea
-              className={cn(screenFieldClass, "min-h-20 resize-y")}
+            <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Comments / Conditions</span>
+            <Textarea
+              className={cn("rounded-none", "min-h-20 resize-y")}
               value={newItem.comments}
               onChange={(event) =>
                 setNewItem((currentItem) => ({
@@ -990,13 +991,13 @@ export default function VotingReportForm() {
               rows={2}
             />
           </label>
-          <button
+          <Button
             type="submit"
             className={cn(primaryButtonClass, "w-full px-5 lg:w-auto lg:min-w-36")}
           >
             <Plus aria-hidden="true" size={18} />
             Add to Table
-          </button>
+          </Button>
         </form>
       </section>
 
@@ -1005,7 +1006,7 @@ export default function VotingReportForm() {
         aria-labelledby="agenda-heading"
       >
         <div className="flex items-center justify-between gap-4 border-b border-border p-4 print:border-0 print:p-0 print:pb-2">
-          <h2 id="agenda-heading" className={sectionHeadingClass}>
+          <h2 id="agenda-heading" className="m-0 mb-6 text-2xl font-bold uppercase tracking-wide text-foreground print:text-black">
             Agenda Items
           </h2>
           <span className="text-xs font-bold text-muted-foreground print:text-black">
@@ -1014,41 +1015,49 @@ export default function VotingReportForm() {
         </div>
 
         <div className="overflow-x-auto print:overflow-visible">
-          <table className="w-full min-w-[760px] table-fixed border-collapse print:min-w-0 print:text-[10pt]">
-            <thead className="bg-muted">
-              <tr>
-                <th className="w-36 border-b border-border px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
+          <Table className="w-full min-w-[760px] table-fixed border-collapse print:min-w-0 print:text-[10pt]">
+            <TableHeader className="bg-muted">
+              <TableRow>
+                <TableHead className="w-36 border-b border-border px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
                   Type
-                </th>
-                <th className="border-b border-border px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
+                </TableHead>
+                <TableHead className="border-b border-border px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
                   Application # / Name
-                </th>
-                <th className="w-56 border-b border-border px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
+                </TableHead>
+                <TableHead className="w-56 border-b border-border px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
                   NPU Recommendation
-                </th>
-                <th className="w-28 border-b border-border px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:hidden">
+                </TableHead>
+                <TableHead className="w-28 border-b border-border px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:hidden">
                   Actions
-                </th>
-              </tr>
-            </thead>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
             {report.items.length === 0 ? (
-              <tbody>
-                <tr>
-                  <td
-                    className="h-20 border-b border-border px-3 py-3 text-center text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1"
+              <TableBody>
+                <TableRow>
+                  <TableCell
+                    className="border-b border-border p-0 text-center text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1"
                     colSpan={4}
                   >
-                    No agenda items added.
-                  </td>
-                </tr>
-              </tbody>
+                    <Empty className="border-0 rounded-none py-12 print:py-4">
+                      <EmptyMedia variant="icon" className="rounded-none border-2 border-foreground bg-muted/50">
+                        <FileText className="size-6 text-foreground" />
+                      </EmptyMedia>
+                      <EmptyHeader>
+                        <EmptyTitle className="uppercase font-extrabold tracking-wide text-foreground">No agenda items</EmptyTitle>
+                        <EmptyDescription className="text-foreground">Add an agenda item above to get started.</EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
             ) : (
               report.items.map((item: AgendaItem, index: number) => {
                 const showComments =
                   item.comments.trim() || item.motion.trim() || item.applicantPresent || openCommentIds.includes(item.id);
 
                 return (
-                  <tbody
+                  <TableBody
                     key={item.id}
                     className={cn(
                       "break-inside-avoid odd:bg-card even:bg-muted/60",
@@ -1060,8 +1069,8 @@ export default function VotingReportForm() {
                     onDrop={(event) => handleDrop(item.id, event)}
                     onDragEnd={() => setDraggingId(null)}
                   >
-                    <tr>
-                      <td className="border-b border-border px-3 py-2 font-extrabold text-foreground print:border print:border-neutral-600 print:px-2 print:py-1">
+                    <TableRow>
+                      <TableCell className="border-b border-border px-3 py-2 font-extrabold text-foreground print:border print:border-neutral-600 print:px-2 print:py-1">
                         <span className="flex cursor-grab items-center gap-1.5 active:cursor-grabbing print:cursor-default">
                           <GripVertical
                             aria-hidden="true"
@@ -1070,8 +1079,8 @@ export default function VotingReportForm() {
                           />
                           <span>{item.itemType}</span>
                         </span>
-                      </td>
-                      <td className="border-b border-border px-3 py-2 print:border print:border-neutral-600 print:px-2 print:py-1">
+                      </TableCell>
+                      <TableCell className="border-b border-border px-3 py-2 print:border print:border-neutral-600 print:px-2 print:py-1">
                         <form.Field name={`items[${index}].applicationName`}>
                           {(field) => (
                             <input
@@ -1084,11 +1093,11 @@ export default function VotingReportForm() {
                             />
                           )}
                         </form.Field>
-                      </td>
-                      <td className="border-b border-border px-3 py-2 text-right print:border print:border-neutral-600 print:px-2 print:py-1">
+                      </TableCell>
+                      <TableCell className="border-b border-border px-3 py-2 text-right print:border print:border-neutral-600 print:px-2 print:py-1">
                         <form.Field name={`items[${index}].recommendation`}>
                           {(field) => (
-                            <select
+                            <NativeSelect
                               className={cn(
                                 inlineEditClass,
                                 "appearance-none text-right",
@@ -1104,17 +1113,17 @@ export default function VotingReportForm() {
                               aria-label={`Recommendation for ${item.applicationName}`}
                             >
                             {RECOMMENDATIONS.map((recommendation) => (
-                              <option key={recommendation.value} value={recommendation.value}>
+                              <NativeSelectOption key={recommendation.value} value={recommendation.value}>
                                 {recommendation.label}
-                              </option>
+                              </NativeSelectOption>
                             ))}
-                            </select>
+                            </NativeSelect>
                           )}
                         </form.Field>
-                      </td>
-                      <td className="border-b border-border px-3 py-2 text-right print:hidden">
+                      </TableCell>
+                      <TableCell className="border-b border-border px-3 py-2 text-right print:hidden">
                         <div className="flex items-center justify-end gap-2">
-                          <button
+                          <Button
                             type="button"
                             className={cn(iconButtonClass, "hover:border-primary/30 hover:bg-muted hover:text-primary")}
                             onClick={() => openCommentEditor(item.id)}
@@ -1122,8 +1131,8 @@ export default function VotingReportForm() {
                             title="Add comments"
                           >
                             <MessageSquarePlus aria-hidden="true" size={18} />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             className={cn(iconButtonClass, "hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive")}
                             onClick={() => handleDeleteItem(item.id)}
@@ -1131,13 +1140,13 @@ export default function VotingReportForm() {
                             title="Delete item"
                           >
                             <Trash2 aria-hidden="true" size={18} />
-                          </button>
+                          </Button>
                         </div>
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                     {showComments ? (
-                      <tr>
-                        <td
+                      <TableRow>
+                        <TableCell
                           colSpan={4}
                           className={
                             item.comments.trim() || item.motion.trim()
@@ -1148,7 +1157,7 @@ export default function VotingReportForm() {
                           <div className="flex flex-col gap-2">
                             <form.Field name={`items[${index}].applicantPresent`}>
                               {(field) => (
-                                <select
+                                <NativeSelect
                                   className={cn(inlineEditClass, "appearance-none font-bold")}
                                   value={field.state.value}
                                   onChange={(event) => field.handleChange(event.target.value as "yes" | "no" | "")}
@@ -1158,10 +1167,10 @@ export default function VotingReportForm() {
                                   }}
                                   aria-label={`Was applicant present for ${item.applicationName}`}
                                 >
-                                  <option value="" disabled>Was the applicant present?</option>
-                                  <option value="yes">Yes</option>
-                                  <option value="no">No</option>
-                                </select>
+                                  <NativeSelectOption value="" disabled>Was the applicant present?</NativeSelectOption>
+                                  <NativeSelectOption value="yes">Yes</NativeSelectOption>
+                                  <NativeSelectOption value="no">No</NativeSelectOption>
+                                </NativeSelect>
                               )}
                             </form.Field>
                             <form.Field name={`items[${index}].motion`}>
@@ -1196,30 +1205,30 @@ export default function VotingReportForm() {
                               )}
                             </form.Field>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ) : null}
-                  </tbody>
+                  </TableBody>
                 );
               })
             )}
-          </table>
+          </Table>
         </div>
       </section>
 
       <section
-        className={cn(reportPanelClass, "shadow-none")}
+        className="mb-8 border-2 border-foreground bg-card p-6 text-sm text-foreground print:mb-6 print:border-0 print:p-0"
         aria-labelledby="notes"
       >
         <div className="mb-4 print:mb-2">
-          <h2 id="notes" className={sectionHeadingClass}>
+          <h2 id="notes" className="m-0 mb-6 text-2xl font-bold uppercase tracking-wide text-foreground print:text-black">
             Planner&apos;s Notes
           </h2>
         </div>
         <form.Field name="plannerNotes">
           {(field) => (
-            <textarea
-              className={cn(screenFieldClass, "min-h-28 resize-y print:hidden")}
+            <Textarea
+              className={cn("rounded-none", "min-h-28 resize-y print:hidden")}
               value={field.state.value}
               onChange={(event) => field.handleChange(event.target.value)}
               onBlur={field.handleBlur}
@@ -1237,7 +1246,7 @@ export default function VotingReportForm() {
 
 
       <section className={cn("mt-8 flex justify-end print:hidden", !isFormValid && "hidden")}>
-        <button
+        <Button
           type="button"
           className={cn(primaryButtonClass, "w-full sm:w-auto sm:min-w-32")}
           onClick={prepareSubmission}
@@ -1245,7 +1254,7 @@ export default function VotingReportForm() {
         >
           <Mail aria-hidden="true" size={18} />
           {isPreparingSubmission ? "Preparing" : "Submit"}
-        </button>
+        </Button>
       </section>
 
       <section className="mt-6 hidden grid-cols-2 gap-4 print:grid" aria-label="Signatures">
