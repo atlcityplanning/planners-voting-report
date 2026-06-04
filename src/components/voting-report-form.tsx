@@ -866,7 +866,7 @@ export default function VotingReportForm() {
         </div>
 
         <form
-          className="grid items-end gap-3 lg:grid-cols-[minmax(8rem,0.75fr)_minmax(14rem,2fr)_minmax(12rem,1fr)_auto]"
+          className="grid items-end gap-3 lg:grid-cols-[minmax(8rem,0.75fr)_minmax(14rem,2fr)_minmax(12rem,1fr)]"
           onSubmit={handleAddItem}
         >
           <label className="grid gap-1">
@@ -939,7 +939,7 @@ export default function VotingReportForm() {
               />
             </span>
           </label>
-          <label className="grid gap-1 lg:col-span-4">
+          <label className="grid gap-1 lg:col-span-3">
             <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Was the applicant present?</span>
             <span className="relative">
               <NativeSelect
@@ -962,7 +962,7 @@ export default function VotingReportForm() {
               />
             </span>
           </label>
-          <label className="grid gap-1 lg:col-span-4">
+          <label className="grid gap-1 lg:col-span-3">
             <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Motion &amp; Votes</span>
             <Input
               className="rounded-none"
@@ -977,7 +977,7 @@ export default function VotingReportForm() {
               placeholder="Motion to approve with conditions, seconded; 16 Y, 3 N, 4 A"
             />
           </label>
-          <label className="grid gap-1 lg:col-span-4">
+          <label className="grid gap-1 lg:col-span-3">
             <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">Comments / Conditions</span>
             <Textarea
               className={cn("rounded-none", "min-h-20 resize-y")}
@@ -1005,7 +1005,7 @@ export default function VotingReportForm() {
         className="mb-4 overflow-hidden rounded-2xl bg-card text-sm text-muted-foreground shadow-sm ring-1 ring-border print:mb-4 print:rounded-none print:shadow-none print:ring-0"
         aria-labelledby="agenda-heading"
       >
-        <div className="flex items-center justify-between gap-4 border-b border-border p-4 print:border-0 print:p-0 print:pb-2">
+        <div className="flex items-center justify-between gap-4 border-b border-border p-6 print:border-0 print:p-0 print:pb-2">
           <h2 id="agenda-heading" className="m-0 mb-6 text-2xl font-bold uppercase tracking-wide text-foreground print:text-black">
             Agenda Items
           </h2>
@@ -1018,16 +1018,16 @@ export default function VotingReportForm() {
           <Table className="w-full min-w-[760px] table-fixed border-collapse print:min-w-0 print:text-[10pt]">
             <TableHeader className="bg-muted">
               <TableRow>
-                <TableHead className="w-36 border-b border-border px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
+                <TableHead className="w-36 border-b border-border px-3 py-3 text-left text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
                   Type
                 </TableHead>
-                <TableHead className="border-b border-border px-3 py-3 text-left text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
+                <TableHead className="border-b border-border px-3 py-3 text-left text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
                   Application # / Name
                 </TableHead>
-                <TableHead className="w-56 border-b border-border px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
+                <TableHead className="w-56 border-b border-border px-3 py-3 text-right text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground print:border print:border-neutral-600 print:px-2 print:py-1 print:text-black">
                   NPU Recommendation
                 </TableHead>
-                <TableHead className="w-28 border-b border-border px-3 py-3 text-right text-[10px] font-extrabold uppercase tracking-wide text-muted-foreground print:hidden">
+                <TableHead className="w-28 border-b border-border px-3 py-3 text-right text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground print:hidden">
                   Actions
                 </TableHead>
               </TableRow>
@@ -1045,7 +1045,7 @@ export default function VotingReportForm() {
                       </EmptyMedia>
                       <EmptyHeader>
                         <EmptyTitle className="uppercase font-extrabold tracking-wide text-foreground">No agenda items</EmptyTitle>
-                        <EmptyDescription className="text-foreground">Add an agenda item above to get started.</EmptyDescription>
+                        <EmptyDescription className="text-foreground">Add an agenda item above.</EmptyDescription>
                       </EmptyHeader>
                     </Empty>
                   </TableCell>
