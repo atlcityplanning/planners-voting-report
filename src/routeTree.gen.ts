@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ReviewTokenRouteImport } from './routes/review.$token'
+import { Route as ReportsIndexRouteImport } from './routes/reports.index'
+import { Route as DashboardIndexRouteImport } from './routes/dashboard.index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as DashboardReportIdRouteImport } from './routes/dashboard.$reportId'
 import { Route as AdminMondayProvisionRouteImport } from './routes/admin.monday-provision'
 import { Route as ReportsReportIdPrintRouteImport } from './routes/reports.$reportId.print'
@@ -26,9 +28,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReviewTokenRoute = ReviewTokenRouteImport.update({
-  id: '/review/$token',
-  path: '/review/$token',
+const ReportsIndexRoute = ReportsIndexRouteImport.update({
+  id: '/reports/',
+  path: '/reports/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardIndexRoute = DashboardIndexRouteImport.update({
+  id: '/dashboard/',
+  path: '/dashboard/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardReportIdRoute = DashboardReportIdRouteImport.update({
@@ -52,7 +64,9 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/admin/monday-provision': typeof AdminMondayProvisionRoute
   '/dashboard/$reportId': typeof DashboardReportIdRoute
-  '/review/$token': typeof ReviewTokenRoute
+  '/admin/': typeof AdminIndexRoute
+  '/dashboard/': typeof DashboardIndexRoute
+  '/reports/': typeof ReportsIndexRoute
   '/reports/$reportId/print': typeof ReportsReportIdPrintRoute
 }
 export interface FileRoutesByTo {
@@ -60,7 +74,9 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/admin/monday-provision': typeof AdminMondayProvisionRoute
   '/dashboard/$reportId': typeof DashboardReportIdRoute
-  '/review/$token': typeof ReviewTokenRoute
+  '/admin': typeof AdminIndexRoute
+  '/dashboard': typeof DashboardIndexRoute
+  '/reports': typeof ReportsIndexRoute
   '/reports/$reportId/print': typeof ReportsReportIdPrintRoute
 }
 export interface FileRoutesById {
@@ -69,7 +85,9 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/admin/monday-provision': typeof AdminMondayProvisionRoute
   '/dashboard/$reportId': typeof DashboardReportIdRoute
-  '/review/$token': typeof ReviewTokenRoute
+  '/admin/': typeof AdminIndexRoute
+  '/dashboard/': typeof DashboardIndexRoute
+  '/reports/': typeof ReportsIndexRoute
   '/reports/$reportId/print': typeof ReportsReportIdPrintRoute
 }
 export interface FileRouteTypes {
@@ -79,7 +97,9 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin/monday-provision'
     | '/dashboard/$reportId'
-    | '/review/$token'
+    | '/admin/'
+    | '/dashboard/'
+    | '/reports/'
     | '/reports/$reportId/print'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -87,7 +107,9 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin/monday-provision'
     | '/dashboard/$reportId'
-    | '/review/$token'
+    | '/admin'
+    | '/dashboard'
+    | '/reports'
     | '/reports/$reportId/print'
   id:
     | '__root__'
@@ -95,7 +117,9 @@ export interface FileRouteTypes {
     | '/about'
     | '/admin/monday-provision'
     | '/dashboard/$reportId'
-    | '/review/$token'
+    | '/admin/'
+    | '/dashboard/'
+    | '/reports/'
     | '/reports/$reportId/print'
   fileRoutesById: FileRoutesById
 }
@@ -104,7 +128,9 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   AdminMondayProvisionRoute: typeof AdminMondayProvisionRoute
   DashboardReportIdRoute: typeof DashboardReportIdRoute
-  ReviewTokenRoute: typeof ReviewTokenRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  DashboardIndexRoute: typeof DashboardIndexRoute
+  ReportsIndexRoute: typeof ReportsIndexRoute
   ReportsReportIdPrintRoute: typeof ReportsReportIdPrintRoute
 }
 
@@ -124,11 +150,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/review/$token': {
-      id: '/review/$token'
-      path: '/review/$token'
-      fullPath: '/review/$token'
-      preLoaderRoute: typeof ReviewTokenRouteImport
+    '/reports/': {
+      id: '/reports/'
+      path: '/reports'
+      fullPath: '/reports/'
+      preLoaderRoute: typeof ReportsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard/': {
+      id: '/dashboard/'
+      path: '/dashboard'
+      fullPath: '/dashboard/'
+      preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard/$reportId': {
@@ -160,7 +200,9 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   AdminMondayProvisionRoute: AdminMondayProvisionRoute,
   DashboardReportIdRoute: DashboardReportIdRoute,
-  ReviewTokenRoute: ReviewTokenRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  DashboardIndexRoute: DashboardIndexRoute,
+  ReportsIndexRoute: ReportsIndexRoute,
   ReportsReportIdPrintRoute: ReportsReportIdPrintRoute,
 }
 export const routeTree = rootRouteImport

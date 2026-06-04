@@ -4,7 +4,7 @@ export default function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur print:hidden">
       <nav className="mx-auto flex min-h-16 w-[min(1180px,calc(100%-2rem))] flex-col items-start gap-3 py-4 sm:flex-row sm:items-center sm:gap-6 sm:py-0">
-        <Link to="/" className="text-sm font-extrabold tracking-tight text-foreground no-underline">
+        <Link to="/" className="text-[11px] font-extrabold tracking-tight text-foreground uppercase no-underline">
           NPU Planner&apos;s Voting Report
         </Link>
 

@@ -16,7 +16,6 @@ import {
   consumeMondayProvisioningKey,
   consumeSignatureToken,
   createReportRevision,
-  createReviewToken,
   failMondayProvisioningKey,
   getActiveMondayBoardConfig,
   getReport,
@@ -144,7 +143,6 @@ export const submitForReview = createServerFn({ method: "POST" })
       actorEmail: report.plannerEmail,
       comments: "Report submitted for centralized review.",
     });
-    await createReviewToken(report.id, "review", report.npuTeamEmail);
     await sendSubmissionNotifications(report);
 
     await syncReportWithMonday(report);

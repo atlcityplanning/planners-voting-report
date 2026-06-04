@@ -245,7 +245,7 @@ const memoryTokens = new Map<
   {
     token: string;
     reportId: string;
-    purpose: "review" | "chair_signature" | "planner_signature";
+    purpose: "chair_signature" | "planner_signature";
     recipientEmail: string;
     expiresAt: string;
     createdAt: string;
@@ -1028,7 +1028,7 @@ export async function createReportRevision(reportId: string, reason: string) {
 
 export async function createReviewToken(
   reportId: string,
-  purpose: "review" | "chair_signature" | "planner_signature",
+  purpose: "chair_signature" | "planner_signature",
   recipientEmail: string,
 ) {
   const token = createId();
