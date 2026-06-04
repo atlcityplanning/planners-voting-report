@@ -556,7 +556,7 @@ export default function VotingReportForm() {
           <label className="grid gap-1">
             <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">NPU Chair Email</span>
             <Input
-              className={cn("rounded-none", !import.meta.env.DEV && "read-only:opacity-60 read-only:cursor-not-allowed")}
+              className={cn("rounded-none", !import.meta.env.DEV && form.state.values.chair === getNpuContactDefault(form.state.values.npu)?.chairName && "read-only:opacity-60 read-only:cursor-not-allowed")}
               value={submissionRecipients.chairEmail}
               onChange={(event) =>
                 setSubmissionRecipients((currentRecipients) => ({
@@ -564,7 +564,7 @@ export default function VotingReportForm() {
                   chairEmail: event.target.value,
                 }))
               }
-              readOnly={!import.meta.env.DEV}
+              readOnly={!import.meta.env.DEV && form.state.values.chair === getNpuContactDefault(form.state.values.npu)?.chairName}
               type="email"
               required
             />
