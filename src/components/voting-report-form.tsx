@@ -13,6 +13,26 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent, FocusEvent, FormEvent, KeyboardEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+
 import {
   INITIAL_REPORT_STATE,
   ITEM_TYPES,
@@ -47,10 +67,10 @@ import { useSelector } from "@tanstack/react-store";
 import {
   uiStore,
   setDraggingId,
-  setDialogMessage,
-  setOpenCommentIds,
+    setOpenCommentIds,
   setSubmissionRecipients,
   setIsPreparingSubmission,
+  setIsSubmissionDialogOpen,
   setIsSubmittingReport,
   setSubmissionMessage,
   setSubmittedReportId,
@@ -59,7 +79,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyMedia } from "@/components/ui/empty";
 
-const LEGACY_STORAGE_KEY = "npu-voting-report:v1";
 const INITIAL_REPORT_JSON = JSON.stringify(INITIAL_REPORT_STATE);
 
 type NewItemForm = {
@@ -151,81 +170,7 @@ function sanitizeReport(candidate: Partial<ReportFormState>): ReportFormState {
   };
 }
 
-function parseLegacyItems(serializedItems: string | null): Array<AgendaItem> {
-  if (!serializedItems || typeof DOMParser === "undefined") {
-    return [];
-  }
 
-  try {
-    const html = JSON.parse(serializedItems) as unknown;
-    if (typeof html !== "string") {
-      return [];
-    }
-
-    const documentFragment = new DOMParser().parseFromString(`<table>${html}</Table>`, "text/html");
-
-    return Array.from(documentFragment.querySelectorAll("tbody"))
-      .map((body) => {
-        const rows = Array.from(body.querySelectorAll("tr"));
-        const cells = Array.from(rows[0]?.querySelectorAll("td") ?? []);
-        const applicationName = cells[1]?.textContent?.trim() ?? "";
-
-        if (!applicationName) {
-          return null;
-        }
-
-        return {
-          id: createItemId(),
-          itemType: normalizeItemType(cells[0]?.textContent?.trim() ?? ""),
-          applicationName,
-          recommendation: normalizeRecommendation(cells[2]?.textContent?.trim() ?? "PENDING"),
-          motion: "",
-          applicantPresent: "" as const,
-          comments: rows[1]?.textContent?.trim() ?? "",
-        };
-      })
-      .filter((item) => item !== null);
-  } catch {
-    return [];
-  }
-}
-
-function loadStoredReport(): ReportFormState {
-  if (typeof window === "undefined") {
-    return INITIAL_REPORT_STATE;
-  }
-
-  const storedReport = window.localStorage.getItem(LEGACY_STORAGE_KEY);
-  if (storedReport) {
-    try {
-      return sanitizeReport(JSON.parse(storedReport) as Partial<ReportFormState>);
-    } catch {
-      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
-    }
-  }
-
-  try {
-    const legacyData = JSON.parse(window.localStorage.getItem("data") ?? "{}") as Record<
-      string,
-      unknown
-    >;
-
-    return sanitizeReport({
-      npu: readString(legacyData.NPU),
-      chair: readString(legacyData.chair),
-      location: readString(legacyData.loc),
-      planner: readString(legacyData.planner),
-      autofill:
-        typeof legacyData.fillToggle === "boolean"
-          ? legacyData.fillToggle
-          : INITIAL_REPORT_STATE.autofill,
-      plannerNotes: window.localStorage.getItem("pNotes") ?? "",
-      items: parseLegacyItems(window.localStorage.getItem("items")),
-    });
-  } catch {
-    return INITIAL_REPORT_STATE;
-  }
-}
 
 function applyContactDefaults(report: ReportFormState, mode: "fill-empty" | "replace") {
   const defaults = getNpuContactDefault(report.npu);
@@ -260,16 +205,14 @@ export default function VotingReportForm() {
   );
   const isDraftStoreReady = votingReportDraftCollection.isReady();
   const draggingId = useSelector(uiStore, (state) => state.draggingId);
-  const dialogMessage = useSelector(uiStore, (state) => state.dialogMessage);
-  const openCommentIds = useSelector(uiStore, (state) => state.openCommentIds);
+    const openCommentIds = useSelector(uiStore, (state) => state.openCommentIds);
   const submissionRecipients = useSelector(uiStore, (state) => state.submissionRecipients);
   const isPreparingSubmission = useSelector(uiStore, (state) => state.isPreparingSubmission);
+  const isSubmissionDialogOpen = useSelector(uiStore, (state) => state.isSubmissionDialogOpen);
   const isSubmittingReport = useSelector(uiStore, (state) => state.isSubmittingReport);
   const submissionMessage = useSelector(uiStore, (state) => state.submissionMessage);
   const submittedReportId = useSelector(uiStore, (state) => state.submittedReportId);
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const submissionDialogRef = useRef<HTMLDialogElement>(null);
-  const dateInputRef = useRef<HTMLInputElement>(null);
+      const dateInputRef = useRef<HTMLInputElement>(null);
   const pendingHydrationJsonRef = useRef("");
   const lastPersistedReportJsonRef = useRef("");
   const navigate = useNavigate();
@@ -294,7 +237,7 @@ export default function VotingReportForm() {
     }
 
     const loaded = applyContactDefaults(
-      activeDraft?.report ? sanitizeReport(activeDraft.report) : loadStoredReport(),
+      activeDraft?.report ? sanitizeReport(activeDraft.report) : INITIAL_REPORT_STATE,
       "fill-empty",
     );
     const serializedLoaded = JSON.stringify(loaded);
@@ -370,10 +313,7 @@ export default function VotingReportForm() {
     };
   }, [printLabels.documentTitle, meetingDate]);
 
-  function showDialog(message: string) {
-    setDialogMessage(message);
-    window.requestAnimationFrame(() => dialogRef.current?.showModal());
-  }
+  
 
   function handleNpuChange(npu: string) {
     const currentReport = form.state.values;
@@ -439,7 +379,7 @@ export default function VotingReportForm() {
     event.preventDefault();
 
     if (!newItem.itemType || !newItem.applicationName.trim()) {
-      showDialog("Please enter an item type and application name.");
+      toast.error("Please enter an item type and application name.");
       return;
     }
 
@@ -468,9 +408,6 @@ export default function VotingReportForm() {
   }
 
   function handleDeleteItem(itemId: string) {
-    if (!window.confirm("Delete this agenda item?")) {
-      return;
-    }
 
     form.setFieldValue("items", form.state.values.items.filter((item) => item.id !== itemId));
   }
@@ -549,9 +486,9 @@ export default function VotingReportForm() {
       }
 
       setSubmissionRecipients(recipients);
-      window.requestAnimationFrame(() => submissionDialogRef.current?.showModal());
+      setIsSubmissionDialogOpen(true);
     } catch (error) {
-      showDialog(error instanceof Error ? error.message : "Unable to prepare submission.");
+      toast.error(error instanceof Error ? error.message : "Unable to prepare submission.");
     } finally {
       setIsPreparingSubmission(false);
     }
@@ -582,7 +519,7 @@ export default function VotingReportForm() {
       });
       setSubmissionMessage("Submitted for review. Notification attempts were logged.");
 
-      submissionDialogRef.current?.close();
+      setIsSubmissionDialogOpen(false);
       navigate({ to: `/dashboard/${submittedReport.id}` });
     } catch (error) {
       setSubmissionMessage(error instanceof Error ? error.message : "Unable to submit report.");
@@ -593,32 +530,18 @@ export default function VotingReportForm() {
 
   return (
     <main className="mx-auto w-[min(1180px,calc(100%-2rem))] py-8 print:w-full print:py-0">
-      <dialog
-        ref={dialogRef}
-        className="m-auto w-[min(26rem,calc(100%-2rem))] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-foreground/40"
-      >
-        <p className="m-0 mb-4 text-sm text-muted-foreground">{dialogMessage}</p>
-        <Button
-          type="button"
-          className={subtleButtonClass}
-          onClick={() => dialogRef.current?.close()}
-        >
-          OK
-        </Button>
-      </dialog>
 
-      <dialog
-        ref={submissionDialogRef}
-        className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-2xl border border-border bg-popover p-6 text-popover-foreground shadow-2xl backdrop:bg-foreground/40"
-      >
-        <div className="mb-5">
-          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-            Submit For Review
-          </p>
-          <h2 className="m-0 text-xl font-extrabold text-foreground">
-            Confirm submission recipients
-          </h2>
-        </div>
+
+      <Dialog open={isSubmissionDialogOpen} onOpenChange={setIsSubmissionDialogOpen}>
+        <DialogContent className="m-auto w-[min(36rem,calc(100%-2rem))] rounded-none border-2 border-border bg-popover p-6 text-popover-foreground shadow-2xl">
+          <DialogHeader className="mb-5 text-left">
+            <DialogDescription className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              Submit For Review
+            </DialogDescription>
+            <DialogTitle className="m-0 text-xl font-extrabold text-foreground">
+              Confirm submission recipients
+            </DialogTitle>
+          </DialogHeader>
         <form className="grid gap-4" onSubmit={handleSubmitForReview}>
           <label className="grid gap-1">
             <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-foreground print:text-black">NPU Chair Email</span>
@@ -669,7 +592,7 @@ export default function VotingReportForm() {
             <Button
               type="button"
               className={subtleButtonClass}
-              onClick={() => submissionDialogRef.current?.close()}
+              onClick={() => setIsSubmissionDialogOpen(false)}
             >
               Close
             </Button>
@@ -683,7 +606,8 @@ export default function VotingReportForm() {
             </Button>
           </div>
         </form>
-      </dialog>
+      </DialogContent>
+      </Dialog>
 
       <header className="mb-6 print:mb-6">
         <img
@@ -1121,15 +1045,32 @@ export default function VotingReportForm() {
                           >
                             <MessageSquarePlus aria-hidden="true" size={18} />
                           </Button>
-                          <Button
-                            type="button"
-                            className={cn(iconButtonClass, "hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive")}
-                            onClick={() => handleDeleteItem(item.id)}
-                            aria-label={`Delete ${item.applicationName}`}
-                            title="Delete item"
-                          >
-                            <Trash2 aria-hidden="true" size={18} />
-                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                type="button"
+                                className={cn(iconButtonClass, "hover:border-destructive/30 hover:bg-destructive/10 hover:text-destructive")}
+                                aria-label={`Delete ${item.applicationName}`}
+                                title="Delete item"
+                              >
+                                <Trash2 aria-hidden="true" size={18} />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="rounded-none border-2">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete this agenda item?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the agenda item.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="rounded-none">Cancel</AlertDialogCancel>
+                                <AlertDialogAction className="rounded-none" onClick={() => handleDeleteItem(item.id)}>
+                                  Continue
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
                       </TableCell>
                     </TableRow>

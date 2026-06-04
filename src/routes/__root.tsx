@@ -3,6 +3,7 @@ import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import SiteFooter from "@/components/site-footer";
 import SiteHeader from "@/components/site-header";
+import { Toaster } from "@/components/ui/sonner"
 
 import appCss from "@/styles.css?url";
 
@@ -46,7 +47,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body className="min-h-screen overflow-x-hidden bg-background font-sans text-foreground antialiased wrap-anywhere selection:bg-primary/15 selection:text-primary">
         <SiteHeader />
-        {children}
+        <Toaster richColors />
+          {children}
         <SiteFooter />
         <TanStackDevtools
           config={{

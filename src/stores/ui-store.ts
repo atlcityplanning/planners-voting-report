@@ -9,10 +9,10 @@ export const EMPTY_SUBMISSION_RECIPIENTS: SubmissionRecipients = {
 
 export type UiState = {
   draggingId: string | null;
-  dialogMessage: string;
   openCommentIds: Array<string>;
   submissionRecipients: SubmissionRecipients;
   isPreparingSubmission: boolean;
+  isSubmissionDialogOpen: boolean;
   isSubmittingReport: boolean;
   submissionMessage: string;
   submittedReportId: string;
@@ -20,10 +20,10 @@ export type UiState = {
 
 export const uiStore = new Store<UiState>({
   draggingId: null,
-  dialogMessage: "",
   openCommentIds: [],
   submissionRecipients: EMPTY_SUBMISSION_RECIPIENTS,
   isPreparingSubmission: false,
+  isSubmissionDialogOpen: false,
   isSubmittingReport: false,
   submissionMessage: "",
   submittedReportId: "",
@@ -33,9 +33,6 @@ export function setDraggingId(id: string | null) {
   uiStore.setState((state) => ({ ...state, draggingId: id }));
 }
 
-export function setDialogMessage(message: string) {
-  uiStore.setState((state) => ({ ...state, dialogMessage: message }));
-}
 
 export function setOpenCommentIds(ids: Array<string> | ((prev: Array<string>) => Array<string>)) {
   uiStore.setState((state) => ({
@@ -66,4 +63,8 @@ export function setSubmissionMessage(message: string) {
 
 export function setSubmittedReportId(id: string) {
   uiStore.setState((state) => ({ ...state, submittedReportId: id }));
+}
+
+export function setIsSubmissionDialogOpen(isOpen: boolean) {
+  uiStore.setState((state) => ({ ...state, isSubmissionDialogOpen: isOpen }));
 }
