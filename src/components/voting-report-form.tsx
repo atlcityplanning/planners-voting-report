@@ -99,7 +99,10 @@ const EMPTY_NEW_ITEM: NewItemForm = {
   comments: "",
 };
 
-
+const REMOVED_FROM_AGENDA_RECOMMENDATION = "Removed from Agenda";
+const DEFAULT_COMMENTS_PLACEHOLDER = "Comments / Conditions";
+const REMOVED_FROM_AGENDA_COMMENTS_PLACEHOLDER =
+  "Please provide context for the removal of the above item";
 
 const fieldClass =
   "min-h-11 w-full border-2 border-foreground bg-card px-3 py-2 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary print:min-h-0 print:border-0 print:bg-transparent print:p-0 print:ring-0 rounded-none";
@@ -125,6 +128,12 @@ function createItemId() {
 
 function readString(value: unknown) {
   return typeof value === "string" ? value : "";
+}
+
+function getCommentsPlaceholder(recommendation: Recommendation) {
+  return recommendation === REMOVED_FROM_AGENDA_RECOMMENDATION
+    ? REMOVED_FROM_AGENDA_COMMENTS_PLACEHOLDER
+    : DEFAULT_COMMENTS_PLACEHOLDER;
 }
 
 function sanitizeItem(item: unknown): AgendaItem | null {
@@ -893,7 +902,7 @@ export default function VotingReportForm() {
                 }))
               }
               type="text"
-              placeholder="Motion to approve with conditions, seconded; 16 Y, 3 N, 4 A"
+              placeholder="ex. Motion to approve with conditions, seconded; 16 Y, 3 N, 4 A"
             />
           </label>
           <label className="grid gap-1 lg:col-span-3">
@@ -908,6 +917,7 @@ export default function VotingReportForm() {
                 }))
               }
               rows={2}
+              placeholder={getCommentsPlaceholder(newItem.recommendation)}
             />
           </label>
           <Button
@@ -974,7 +984,11 @@ export default function VotingReportForm() {
             ) : (
               items.map((item: AgendaItem, index: number) => {
                 const showComments =
-                  item.comments.trim() || item.motion.trim() || item.applicantPresent || openCommentIds.includes(item.id);
+                  item.comments.trim() ||
+                  item.motion.trim() ||
+                  item.applicantPresent ||
+                  item.recommendation === REMOVED_FROM_AGENDA_RECOMMENDATION ||
+                  openCommentIds.includes(item.id);
 
                 return (
                   <TableBody
@@ -1026,9 +1040,13 @@ export default function VotingReportForm() {
                                   : "text-foreground",
                               )}
                               value={field.state.value}
-                              onChange={(event) =>
-                                field.handleChange(normalizeRecommendation(event.target.value))
-                              }
+                              onChange={(event) => {
+                                const nextRecommendation = normalizeRecommendation(event.target.value);
+                                field.handleChange(nextRecommendation);
+                                if (nextRecommendation === REMOVED_FROM_AGENDA_RECOMMENDATION) {
+                                  openCommentEditor(item.id);
+                                }
+                              }}
                               onBlur={field.handleBlur}
                               aria-label={`Recommendation for ${item.applicationName}`}
                             >
@@ -1120,7 +1138,7 @@ export default function VotingReportForm() {
                                     field.handleBlur();
                                     closeEmptyCommentEditor(item);
                                   }}
-                                  placeholder="Motion to ..., 16 Y, 3 N, 4 A"
+                                  placeholder="ex. Motion to ..., 16 Y, 3 N, 4 A"
                                   aria-label={`Motion for ${item.applicationName}`}
                                 />
                               )}
@@ -1136,7 +1154,7 @@ export default function VotingReportForm() {
                                     closeEmptyCommentEditor(item);
                                   }}
                                   rows={2}
-                                  placeholder="Comments / Conditions"
+                                  placeholder={getCommentsPlaceholder(item.recommendation)}
                                   aria-label={`Comments for ${item.applicationName}`}
                                 />
                               )}

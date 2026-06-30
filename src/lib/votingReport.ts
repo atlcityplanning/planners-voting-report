@@ -47,6 +47,7 @@ export const RECOMMENDATIONS = [
   { value: 'Defer', label: 'Defer' },
   { value: 'Abstain', label: 'Abstain' },
   { value: 'Applicant Not Present', label: 'Applicant Not Present' },
+  { value: 'Removed from Agenda', label: 'Removed from Agenda' },
   { value: 'Review and Comment', label: 'Review and Comment' },
 ] as const
 
